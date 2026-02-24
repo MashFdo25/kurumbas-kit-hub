@@ -34,8 +34,8 @@ import {
 
 // --- ASSETS & CONFIG ---
 const TEAM_LOGO = "Kurumba_Logo.png";
-const MATCH_KIT_IMG = "Front.jpg";
-const TRAINING_KIT_IMG = "Back.jpg";
+const MATCH_KIT_IMG = "Back.jpg";
+const TRAINING_KIT_IMG = "Front.jpg";
 
 const POLO_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.21 PM.png";
 const TSHIRT_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.58 PM.png";
