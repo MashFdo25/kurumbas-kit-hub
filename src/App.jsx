@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 // --- ASSETS & CONFIG ---
-const TEAM_LOGO = "Kurumba Logo.jpg";
+const TEAM_LOGO = "Kurumba_Logo.png";
 const MATCH_KIT_IMG = "1000097529.jpg";
 const TRAINING_KIT_IMG = "1000097528.jpg";
 
