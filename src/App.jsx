@@ -22,6 +22,7 @@ const TSHIRT_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.58 PM.png";
 const PANTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.50 PM.png";
 const SHORTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.10.08 PM.png";
 
+// --- ENVIRONMENT ADAPTER ---
 const getEnv = (key) => {
   try { return import.meta.env[key] || process.env[key] || ""; } 
   catch (e) { return ""; }
@@ -246,16 +247,37 @@ const App = () => {
   const exportToExcel = async () => {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     const XLSX = window.XLSX;
-    const rows = [["Player Name", "Squad Print", "Squad Bundle Sizes", "Family Jerseys", "Extra Paid Gear"]];
+    
+    const rows = [
+      ["Associated Member", "Category", "Garment Type", "Print Name", "Print Number", "Size", "Custom Size Note"]
+    ];
+
     orders.forEach(o => {
-      const bundle = `Polo: ${o.customJerseySize || o.jerseySize}, Pants: ${o.customPantSize || o.pantSize}, Shorts: ${o.customShortSize || o.shortSize}, Skinny: ${o.customSkinnySize || o.skinnySize}`;
-      const format = (list) => list?.map(k => `1x ${k.name?.toUpperCase() || ''} #${k.number || ''} | ${k.customSize || k.size}`).join('; ') || "-";
-      rows.push([(o.playerName || "").toUpperCase(), `${(o.jerseyName || "").toUpperCase()} #${o.number}`, bundle, format(o.familyKits), format(o.extraPaidJerseys)]);
+      const pName = (o.playerName || "").toUpperCase();
+      const pPrint = (o.jerseyName || "").toUpperCase();
+
+      // Main Bundle Rows
+      rows.push([pName, "Squad Bundle", "Match Polo", pPrint, o.number, o.jerseySize, o.customJerseySize || ""]);
+      rows.push([pName, "Squad Bundle", "Training Vest", pPrint, o.number, o.jerseySize, o.customJerseySize || ""]);
+      rows.push([pName, "Squad Bundle", "Long Pants", "", "", o.pantSize, o.customPantSize || ""]);
+      rows.push([pName, "Squad Bundle", "Training Shorts", "", "", o.shortSize, o.customShortSize || ""]);
+      rows.push([pName, "Squad Bundle", "Training Skinny", "", "", o.skinnySize, o.customSkinnySize || ""]);
+
+      // Family Rows
+      o.familyKits?.forEach(fk => {
+        rows.push([pName, "Family Support", "Match Polo", (fk.name || "").toUpperCase(), fk.number || "", fk.size, fk.customSize || ""]);
+      });
+
+      // Extra Paid Rows
+      o.extraPaidJerseys?.forEach(ek => {
+        rows.push([pName, "Extra Gear", "Match Polo", (ek.name || "").toUpperCase(), ek.number || "", ek.size, ek.customSize || ""]);
+      });
     });
+
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb, "Kurumbas_CC_Manufacturer_Report.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "KCC Order Sheet");
+    XLSX.writeFile(wb, "Kurumbas_CC_Master_Order_Sheet.xlsx");
   };
 
   const handleOrderSubmit = async (e) => {
@@ -277,6 +299,7 @@ const App = () => {
 
   const handleEditOrder = (order) => { setEditingOrder(order); setFormData(order); setView('customize'); };
   const handleDeleteOrder = async (id) => { if (window.confirm("Delete?")) await deleteDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', id)); };
+  
   const handleDownload = async (elId, fname) => {
     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
     const canvas = await window.html2canvas(document.getElementById(elId), { scale: 2, useCORS: true });
@@ -309,11 +332,12 @@ const App = () => {
             <div className="space-y-10">
               <div className="flex items-center gap-4 border-b border-slate-800 pb-5"><div className="bg-orange-500 p-3 rounded-2xl shadow-inner"><Users size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">1. Identity</h3></div>
               <div className="grid md:grid-cols-3 gap-8 items-end">
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Legal Name</label><input required placeholder="Your Full Name" value={formData.playerName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-bold" onChange={e => setFormData({...formData, playerName: e.target.value})} /></div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Full Name</label><input required placeholder="Your Full Name" value={formData.playerName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-bold" onChange={e => setFormData({...formData, playerName: e.target.value})} /></div>
                 <div className="space-y-2"><div className="flex justify-between items-center h-4"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Jersey Print</label><button type="button" onClick={generateAIPersona} className="text-orange-500 text-[10px] font-black uppercase flex items-center gap-1 hover:text-white"><Sparkles size={12}/> AI</button></div><input required maxLength={12} placeholder="JOHN" value={formData.jerseyName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none uppercase font-black focus:border-orange-500" onChange={e => setFormData({...formData, jerseyName: e.target.value})} /></div>
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Squad #</label><input required type="number" placeholder="00" value={formData.number || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-black text-2xl" onChange={e => setFormData({...formData, number: e.target.value})} /></div>
               </div>
             </div>
+            
             <div className="space-y-10">
               <div className="flex items-center gap-4 border-b border-slate-800 pb-5"><div className="bg-orange-500 p-3 rounded-2xl shadow-inner"><Shirt size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">2. Squad Sizing</h3></div>
               <div className="grid md:grid-cols-2 gap-12 pt-4">
@@ -323,6 +347,7 @@ const App = () => {
                 <SizeSelector label="Training Skinny" value={formData.skinnySize} options={['XS','S','M','L','XL','2XL','3XL']} onChange={v => setFormData(prev => ({...prev, skinnySize: v}))} customValue={formData.customSkinnySize} onCustomChange={val => setFormData(prev => ({...prev, customSkinnySize: val}))} />
               </div>
             </div>
+
             <div className="space-y-10">
               <div className="flex items-center justify-between border-b border-slate-800 pb-5">
                 <div className="flex items-center gap-4"><div className="bg-pink-600 p-3 rounded-2xl"><Heart size={24} className="text-white"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic text-pink-500">3. Family Support</h3></div>
@@ -344,6 +369,7 @@ const App = () => {
                 ))}
               </div>
             </div>
+
             <div className="space-y-10">
               <div className="flex items-center justify-between border-b border-slate-800 pb-5">
                 <div className="flex items-center gap-4"><div className="bg-yellow-500 p-3 rounded-2xl"><ShoppingBag size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">4. Extra Gear</h3></div>
@@ -362,6 +388,7 @@ const App = () => {
                 ))}
               </div>
             </div>
+
             <button disabled={isSubmitting || !formData.playerName} type="submit" className="w-full bg-white text-black py-8 rounded-[3rem] font-black text-3xl hover:bg-orange-500 transition-all shadow-2xl disabled:opacity-30 uppercase italic flex items-center justify-center gap-4">
               {isSubmitting ? <><Loader2 className="animate-spin" size={32}/> CONFIRMING...</> : (editingOrder ? "UPDATE REGISTRATION" : "REGISTER FOR 2026")}
             </button>
