@@ -12,7 +12,7 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query } from 'firebase/firestore';
 
 // --- ASSETS & CONFIG ---
-const TEAM_LOGO = "Kurumba_Logo.png";
+const TEAM_LOGO = "Kurumba Logo.jpg";
 const FRONT_VIEW_IMG = "Front.jpg";  // Used for Gear References
 const BACK_VIEW_IMG = "Back.jpg";    // Used for Name/Number previews
 
@@ -79,7 +79,7 @@ const SIZE_CHARTS = {
   ]
 };
 
-// --- SUB-COMPONENTS (Defined outside App to prevent focus loss) ---
+// --- SUB-COMPONENTS (Defined outside App to prevent focus loss while typing) ---
 
 const SizeSelector = ({ label, value, options, onChange, customValue, onCustomChange }) => (
   <div className="space-y-3">
@@ -105,7 +105,7 @@ const SizeSelector = ({ label, value, options, onChange, customValue, onCustomCh
       </div>
       <input 
         placeholder="Or Enter Custom Size..." 
-        value={customValue}
+        value={customValue || ""}
         onChange={(e) => onCustomChange(e.target.value)}
         className={`w-full bg-slate-950/50 border ${customValue ? 'border-orange-500 text-orange-500' : 'border-slate-800 text-slate-400'} p-3 pl-10 rounded-xl text-[10px] outline-none transition-all placeholder:text-slate-800 focus:border-orange-500`}
       />
@@ -249,7 +249,7 @@ const App = () => {
         }
       } catch (err) { 
         console.error("Firebase Auth Error:", err); 
-        setErrorMessage(err.message);
+        setErrorMessage("Database Authentication Failed. Please check console.");
         setDbStatus('error'); 
       }
     };
@@ -278,7 +278,7 @@ const App = () => {
       (error) => {
         console.error("Firestore Listen Error:", error);
         setDbStatus('error');
-        setErrorMessage(error.message);
+        setErrorMessage("Live Sync Failed: " + error.message);
       }
     );
     return () => unsubscribe();
@@ -408,31 +408,66 @@ const App = () => {
     if (isSubmitting || !user) return;
     
     setIsSubmitting(true);
+    setErrorMessage("");
     
     try {
       const orderId = Date.now().toString();
+      
+      // Clean data to ensure no 'undefined' values (which Firestore rejects)
       const finalOrder = { 
-        ...formData, 
-        currentPriceAtOrder: extraJerseyPrice,
+        playerName: formData.playerName || "",
+        jerseyName: formData.jerseyName || "",
+        number: formData.number || "",
+        jerseySize: formData.jerseySize || "",
+        customJerseySize: formData.customJerseySize || "",
+        pantSize: formData.pantSize || "",
+        customPantSize: formData.customPantSize || "",
+        shortSize: formData.shortSize || "",
+        customShortSize: formData.customShortSize || "",
+        skinnySize: formData.skinnySize || "",
+        customSkinnySize: formData.customSkinnySize || "",
+        familyKits: formData.familyKits.map(k => ({
+          id: k.id,
+          name: k.name || "",
+          number: k.number || "",
+          size: k.size || "",
+          customSize: k.customSize || ""
+        })),
+        extraPaidJerseys: formData.extraPaidJerseys.map(k => ({
+          id: k.id,
+          name: k.name || "",
+          number: k.number || "",
+          size: k.size || "",
+          customSize: k.customSize || ""
+        })),
+        currentPriceAtOrder: extraJerseyPrice || 2800,
         timestamp: Date.now()
       };
       
       if (db && user) {
-        await setDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId), finalOrder);
+        // Use a timeout race to prevent hanging indefinitely
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Database timeout. Check your connection.")), 10000)
+        );
+        
+        await Promise.race([
+          setDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId), finalOrder),
+          timeoutPromise
+        ]);
+        
+        setLastOrder(finalOrder);
+        setView('success');
+        
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        document.head.appendChild(script);
+        script.onload = () => { if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); };
       } else {
         throw new Error("Database not ready. Please try again in a moment.");
       }
-      
-      setLastOrder(finalOrder);
-      setView('success');
-      
-      const script = document.createElement('script');
-      script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
-      document.head.appendChild(script);
-      script.onload = () => { if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); };
     } catch (err) {
       console.error("Submission failed:", err);
-      setErrorMessage(err.message);
+      setErrorMessage("Registration failed: " + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -511,7 +546,7 @@ const App = () => {
         <div className="max-w-4xl mx-auto mb-8 bg-red-500/10 border border-red-500/20 p-6 rounded-3xl flex items-center gap-4 text-red-400 font-bold animate-in slide-in-from-top">
           <AlertTriangle size={24} /> 
           <div>
-            <p className="text-sm">Submission Error</p>
+            <p className="text-sm">Database Error</p>
             <p className="text-[10px] font-normal opacity-80">{errorMessage}</p>
           </div>
           <button onClick={() => setErrorMessage("")} className="ml-auto bg-red-500/20 p-2 rounded-full hover:bg-red-500 hover:text-white transition-all"><X size={16}/></button>
@@ -525,12 +560,12 @@ const App = () => {
             <div className="space-y-10">
               <div className="flex items-center gap-4 border-b border-slate-800 pb-5"><div className="bg-orange-500 p-3 rounded-2xl shadow-inner"><Users size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">1. Identity</h3></div>
               <div className="grid md:grid-cols-3 gap-8">
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Legal Name</label><input required placeholder="Your Full Name" value={formData.playerName} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-bold transition-all" onChange={e => setFormData({...formData, playerName: e.target.value})} /></div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Legal Name</label><input required placeholder="Your Full Name" value={formData.playerName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-bold transition-all" onChange={e => setFormData({...formData, playerName: e.target.value})} /></div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Jersey Print</label><button type="button" onClick={generateAIPersona} className="text-orange-500 text-[10px] font-black uppercase flex items-center gap-1 hover:text-white transition-all"><Sparkles size={12}/> AI</button></div>
-                  <input required maxLength={12} placeholder="THAAL" value={formData.jerseyName} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none uppercase font-black focus:border-orange-500 transition-all" onChange={e => setFormData({...formData, jerseyName: e.target.value})} />
+                  <input required maxLength={12} placeholder="THAAL" value={formData.jerseyName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none uppercase font-black focus:border-orange-500 transition-all" onChange={e => setFormData({...formData, jerseyName: e.target.value})} />
                 </div>
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Squad #</label><input required type="number" placeholder="00" value={formData.number} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-black text-2xl transition-all" onChange={e => setFormData({...formData, number: e.target.value})} /></div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Squad #</label><input required type="number" placeholder="00" value={formData.number || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-black text-2xl transition-all" onChange={e => setFormData({...formData, number: e.target.value})} /></div>
               </div>
             </div>
 
@@ -566,15 +601,15 @@ const App = () => {
                     <div className="grid grid-cols-3 gap-6">
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">Name (Optional)</label>
-                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-pink-600 transition-all" value={k.name} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-pink-600 transition-all" value={k.name || ""} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">No. (Optional)</label>
-                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-pink-600 transition-all" value={k.number} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-pink-600 transition-all" value={k.number || ""} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-pink-500 uppercase tracking-[0.2em]">Size (Required)</label>
-                        <select className="w-full bg-slate-900 border border-pink-500/20 p-4 rounded-xl text-xs font-black outline-none appearance-none" value={k.size} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>
+                        <select className="w-full bg-slate-900 border border-pink-500/20 p-4 rounded-xl text-xs font-black outline-none appearance-none" value={k.size || "W-M"} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>
                           <optgroup label="Adults">{['W-XS','W-S','W-M','W-L'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
                           <optgroup label="Kids">{['9XS','8XS','7XS','6XS','5XS','4XS','3XS','2X'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
                         </select>
@@ -582,7 +617,7 @@ const App = () => {
                     </div>
                     <div className="relative group">
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-orange-500 transition-colors"><Type size={14}/></div>
-                      <input placeholder="Or Enter Custom Size for relative..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" value={k.customSize} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
+                      <input placeholder="Or Enter Custom Size for relative..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" value={k.customSize || ""} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
                     </div>
                   </div>
                 ))}
@@ -616,20 +651,20 @@ const App = () => {
                     <div className="grid grid-cols-3 gap-6">
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">Name (Optional)</label>
-                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-yellow-500 transition-all" value={k.name} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-yellow-500 transition-all" value={k.name || ""} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">No. (Optional)</label>
-                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-yellow-500 transition-all" value={k.number} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-yellow-500 transition-all" value={k.number || ""} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-orange-500 uppercase tracking-[0.2em]">Size (Required)</label>
-                        <select className="w-full bg-slate-900 border border-orange-500/20 p-4 rounded-xl text-xs font-black outline-none" value={k.size} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>{['XS','S','M','L','XL','2XL','3XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</select>
+                        <select className="w-full bg-slate-900 border border-orange-500/20 p-4 rounded-xl text-xs font-black outline-none" value={k.size || "M"} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>{['XS','S','M','L','XL','2XL','3XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</select>
                       </div>
                     </div>
                     <div className="relative group">
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-orange-500 transition-colors"><Type size={14}/></div>
-                      <input placeholder="Or Enter Custom Size for this item..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" value={k.customSize} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
+                      <input placeholder="Or Enter Custom Size for this item..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" value={k.customSize || ""} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
                     </div>
                   </div>
                 ))}
@@ -671,7 +706,7 @@ const App = () => {
   );
 
   if (view === 'success') return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white font-sans">
       <div className="bg-green-500 p-10 rounded-full mb-12 shadow-[0_0_120px_rgba(34,197,94,0.4)] animate-bounce"><CheckCircle2 size={80}/></div>
       <h1 className="text-8xl md:text-9xl font-black italic uppercase mb-8 tracking-tighter leading-none">LOCKED <span className="text-orange-500">IN.</span></h1>
       <div id="share-card" className="w-[360px] h-[640px] bg-black rounded-[4rem] overflow-hidden relative shadow-[0_60px_140px_rgba(0,0,0,1)] border border-white/5 mb-10">
@@ -688,7 +723,7 @@ const App = () => {
   );
 
   if (view === 'admin-auth') return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 font-sans">
       <div className="bg-slate-900 p-16 md:p-24 rounded-[5rem] border border-slate-800 shadow-2xl max-w-xl w-full text-center space-y-14">
         <div className="bg-orange-500/10 w-28 h-28 rounded-full flex items-center justify-center mx-auto border border-orange-500/20 shadow-inner"><Lock className="text-orange-500" size={56} /></div>
         <input type="password" placeholder="••••" className="w-full bg-slate-950 border border-slate-800 p-8 rounded-[3rem] text-center text-7xl text-white outline-none focus:border-orange-500 transition-all font-mono tracking-[0.6em]"
@@ -699,7 +734,7 @@ const App = () => {
   );
 
   if (view === 'admin') return (
-    <div className="min-h-screen bg-slate-950 p-8 md:p-14 overflow-y-auto text-white">
+    <div className="min-h-screen bg-slate-950 p-8 md:p-14 overflow-y-auto text-white font-sans">
       <div className="max-w-7xl mx-auto space-y-20">
         <div className="flex justify-between items-end"><h1 className="text-6xl font-black text-orange-500 uppercase italic tracking-tighter leading-none">Control</h1><div className="flex gap-6"><button onClick={generateAdminBrief} disabled={isAdminAiLoading} className="bg-orange-500 text-black px-10 py-4 rounded-[2rem] text-sm font-black uppercase flex items-center gap-4 hover:scale-105 transition-all italic">{isAdminAiLoading ? <Wand2 className="animate-spin" size={20}/> : <Sparkles size={20}/>} ✨ AI Brief</button><button onClick={() => setView('landing')} className="bg-slate-800 p-5 rounded-[2rem] hover:text-white transition-all shadow-xl"><X size={32}/></button></div></div>
         
@@ -715,11 +750,11 @@ const App = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
            <div className="bg-slate-900 p-12 rounded-[4rem] border border-slate-800 shadow-2xl flex flex-col justify-between">
-              <div><p className="text-[11px] opacity-40 uppercase font-black mb-5 tracking-widest">Extra Price</p><input type="number" value={extraJerseyPrice} className="bg-slate-950 border border-orange-500/30 p-3 rounded-xl text-3xl font-black w-full outline-none focus:border-orange-500 transition-all" onChange={(e) => setExtraJerseyPrice(Number(e.target.value))} /></div>
+              <div><p className="text-[11px] opacity-40 uppercase font-black mb-5 tracking-widest">Extra Price</p><input type="number" value={extraJerseyPrice || 0} className="bg-slate-950 border border-orange-500/30 p-3 rounded-xl text-3xl font-black w-full outline-none focus:border-orange-500 transition-all" onChange={(e) => setExtraJerseyPrice(Number(e.target.value))} /></div>
               <p className="text-[9px] text-orange-500/50 font-bold uppercase mt-4">Current Unit Cost (LKR)</p>
            </div>
            <div className="bg-slate-900 p-12 rounded-[4rem] border border-slate-800 shadow-2xl"><p className="text-[11px] opacity-40 uppercase font-black mb-5 tracking-widest">Squad</p><p className="text-6xl font-black text-white italic">{orders.length}</p></div>
-           <div className="bg-slate-900 p-12 rounded-[4rem] border border-slate-800 shadow-2xl"><p className="text-[11px] opacity-40 uppercase font-black mb-5 tracking-widest">Family</p><p className="text-6xl font-black text-white italic">{orders.reduce((s,o)=>s+o.familyKits.length,0)}</p></div>
+           <div className="bg-slate-900 p-12 rounded-[4rem] border border-slate-800 shadow-2xl"><p className="text-[11px] opacity-40 uppercase font-black mb-5 tracking-widest">Family</p><p className="text-6xl font-black text-white italic">{orders.reduce((s,o)=>s+(o.familyKits?.length || 0),0)}</p></div>
            <div className="bg-slate-900 p-12 rounded-[4rem] border border-slate-800 shadow-2xl">
               <p className="text-[11px] opacity-40 uppercase font-black mb-5 tracking-widest">Custom Prints</p>
               <p className="text-6xl font-black text-white italic">{totalPrintsRequired}</p>
@@ -757,8 +792,8 @@ const App = () => {
                       <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">Sk:{o.customSkinnySize || o.skinnySize}</span>
                     </div></td>
                     <td className="p-12 text-center"><div className="flex flex-col items-center gap-2">
-                      <span className="bg-pink-500/10 text-pink-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Fam: {o.familyKits.length}</span>
-                      <span className="bg-yellow-500/10 text-yellow-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Paid: {o.extraPaidJerseys.length}</span>
+                      <span className="bg-pink-500/10 text-pink-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Fam: {o.familyKits?.length || 0}</span>
+                      <span className="bg-yellow-500/10 text-yellow-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Paid: {o.extraPaidJerseys?.length || 0}</span>
                     </div></td>
                     <td className="p-12 text-right"><button onClick={() => handleDeleteOrder(o.id)} className="bg-slate-800 p-5 rounded-[2rem] text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-2xl active:scale-90"><Trash2 size={28}/></button></td>
                   </tr>
