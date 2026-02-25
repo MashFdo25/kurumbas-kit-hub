@@ -32,16 +32,18 @@ const getEnv = (key) => {
   return "";
 };
 
-const apiKey = getEnv('VITE_GEMINI_API_KEY');
-const GEMINI_MODEL = "gemini-2.0-flash"; 
+// --- PRODUCTION CONFIGURATION (NETLIFY) ---
+const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY; 
+const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
 
 const firebaseConfig = {
-  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
-  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
-  projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
-  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
-  appId: getEnv('VITE_FIREBASE_APP_ID')
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
 };
 
 // Singleton pattern for Netlify/Vite stability
