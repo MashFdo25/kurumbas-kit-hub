@@ -3,7 +3,7 @@ import {
   Users, Lock, PlusCircle, Trash2, X, Share2, Heart, Shirt, 
   FileText, Ruler, Sparkles, Wand2, ShoppingBag, ArrowRight, 
   ChevronLeft, Layout, Type, Banknote, FileSpreadsheet, Download,
-  CheckCircle2, AlertTriangle, Database
+  CheckCircle2, AlertTriangle, Database, Loader2
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -12,11 +12,11 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query } from 'firebase/firestore';
 
 // --- ASSETS & CONFIG ---
-const TEAM_LOGO = "Kurumba_Logo.png";
+const TEAM_LOGO = "Kurumba Logo.jpg";
 const FRONT_VIEW_IMG = "Front.jpg";  // Used for Gear References
 const BACK_VIEW_IMG = "Back.jpg";    // Used for Name/Number previews
 
-// For internal logic mapping
+// Logic mapping
 const MATCH_KIT_IMG = FRONT_VIEW_IMG;
 const TRAINING_KIT_IMG = FRONT_VIEW_IMG;
 const PREVIEW_CARD_IMG = BACK_VIEW_IMG;
@@ -29,18 +29,6 @@ const SHORTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.10.08 PM.png";
 // Hardcoded for preview compatibility. For Netlify deployment, use import.meta.env
 const apiKey = "gen-lang-client-0867680743"; 
 const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
-
-// --- SCRIPT LOADER ---
-const loadScript = (src) => {
-  return new Promise((resolve) => {
-    if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.head.appendChild(script);
-  });
-};
 
 // --- DATABASE CONFIGURATION ---
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -87,9 +75,118 @@ const SIZE_CHARTS = {
     { size: 'L', waist: '30/32', length: '40"', short: '19"' },
     { size: 'XL', waist: '34/36', length: '40.5"', short: '20"' },
     { size: '2XL', waist: '34/36', length: '40.5"', short: '20"' },
-    { size: '3XL', width: '38/40', length: '41.25"', short: '21"' },
+    { size: '3XL', waist: '38/40', length: '41.25"', short: '21"' },
   ]
 };
+
+// --- SUB-COMPONENTS (Defined outside App to prevent focus loss) ---
+
+const SizeSelector = ({ label, value, options, onChange, customValue, onCustomChange }) => (
+  <div className="space-y-3">
+    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{label}</label>
+    <div className="flex flex-wrap gap-1.5">
+      {options.map(opt => (
+        <button 
+          key={opt} 
+          type="button" 
+          onClick={() => {
+            onChange(opt);
+            if (onCustomChange) onCustomChange(""); 
+          }} 
+          className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${value === opt && !customValue ? 'bg-orange-500 text-black border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-slate-950 text-slate-500 border-slate-800 hover:border-slate-700'}`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+    <div className="relative group">
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-orange-500 transition-colors">
+        <Type size={14} />
+      </div>
+      <input 
+        placeholder="Or Enter Custom Size..." 
+        value={customValue}
+        onChange={(e) => onCustomChange(e.target.value)}
+        className={`w-full bg-slate-950/50 border ${customValue ? 'border-orange-500 text-orange-500' : 'border-slate-800 text-slate-400'} p-3 pl-10 rounded-xl text-[10px] outline-none transition-all placeholder:text-slate-800 focus:border-orange-500`}
+      />
+    </div>
+  </div>
+);
+
+const SizeChartModal = ({ activeChartTab, setActiveChartTab, setShowSizeChart }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
+    <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row h-[85vh] lg:h-auto overflow-y-auto shadow-2xl">
+      <div className="flex-1 p-8 md:p-12 space-y-8">
+        <div className="flex justify-between items-center"><h3 className="text-3xl font-black italic uppercase">Tech Sizing</h3><button onClick={() => setShowSizeChart(false)} className="bg-slate-800 p-3 rounded-full hover:bg-orange-500 transition-all"><X size={20}/></button></div>
+        <div className="flex gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+          {Object.keys(SIZE_CHARTS).map(t => (
+            <button 
+              key={t} 
+              onClick={() => setActiveChartTab(t)} 
+              className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase transition-all ${activeChartTab === t ? 'bg-orange-500 text-black shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-white'}`}
+            >
+              {t.replace(/([A-Z])/g, ' $1')}
+            </button>
+          ))}
+        </div>
+        <div className="bg-slate-950 rounded-[2rem] overflow-hidden border border-slate-800 shadow-2xl">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-800/40 text-slate-500 uppercase font-black tracking-widest border-b border-slate-800 text-[10px]">
+                <th className="p-6">Size</th>
+                {activeChartTab.includes('Jersey') ? (
+                  <><th className="p-6">Width (In)</th><th className="p-6">Height (In)</th></>
+                ) : (
+                  <><th className="p-6">Waist</th><th className="p-6">Pants Len</th><th className="p-6">Shorts Len</th></>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {SIZE_CHARTS[activeChartTab].map((r, i) => (
+                <tr key={i} className="border-b border-slate-800/30 hover:bg-white/5 transition-colors text-sm font-bold">
+                  <td className="p-6 font-black text-orange-500 italic">{r.size}</td>
+                  {activeChartTab.includes('Jersey') ? (
+                    <><td className="p-6">{r.width}</td><td className="p-6">{r.height}</td></>
+                  ) : (
+                    <><td className="p-6">{r.waist}</td><td className="p-6">{r.length}</td><td className="p-6">{r.short}</td></>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="w-full md:w-80 bg-slate-950/50 p-8 flex flex-col items-center justify-start gap-6 border-t md:border-t-0 md:border-l border-slate-800 overflow-y-auto">
+         <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest w-full text-center mb-2">How to Measure</p>
+         {activeChartTab.includes('Jersey') ? (
+           <div className="space-y-6 w-full">
+             <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
+               <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Match Polo</p>
+               <img src={POLO_MEASURE_IMG} alt="Polo Measurement" className="w-full object-contain" />
+             </div>
+             <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
+               <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Training T-Shirt</p>
+               <img src={TSHIRT_MEASURE_IMG} alt="T-Shirt Measurement" className="w-full object-contain" />
+             </div>
+           </div>
+         ) : (
+           <div className="space-y-6 w-full">
+             <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
+               <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Long Pants</p>
+               <img src={PANTS_MEASURE_IMG} alt="Pants Measurement" className="w-full object-contain" />
+             </div>
+             <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
+               <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Shorts</p>
+               <img src={SHORTS_MEASURE_IMG} alt="Shorts Measurement" className="w-full object-contain" />
+             </div>
+           </div>
+         )}
+      </div>
+    </div>
+  </div>
+);
+
+// --- MAIN APP COMPONENT ---
 
 const App = () => {
   const [view, setView] = useState('landing');
@@ -102,6 +199,7 @@ const App = () => {
   const [orders, setOrders] = useState([]);
   const [user, setUser] = useState(null);
   const [dbStatus, setDbStatus] = useState('connecting');
+  const [errorMessage, setErrorMessage] = useState("");
 
   const [formData, setFormData] = useState({
     playerName: '', jerseyName: '', number: '',
@@ -118,6 +216,18 @@ const App = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [adminAiBrief, setAdminAiBrief] = useState("");
   const [isAdminAiLoading, setIsAdminAiLoading] = useState(false);
+
+  // --- SCRIPT LOADER HELPER ---
+  const loadScript = (src) => {
+    return new Promise((resolve) => {
+      if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+  };
 
   // --- DERIVED METRICS ---
   const totalPrintsRequired = useMemo(() => {
@@ -139,6 +249,7 @@ const App = () => {
         }
       } catch (err) { 
         console.error("Firebase Auth Error:", err); 
+        setErrorMessage(err.message);
         setDbStatus('error'); 
       }
     };
@@ -146,7 +257,10 @@ const App = () => {
     
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (u) setDbStatus('connected');
+      if (u) {
+        setDbStatus('connected');
+        setErrorMessage("");
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -164,6 +278,7 @@ const App = () => {
       (error) => {
         console.error("Firestore Listen Error:", error);
         setDbStatus('error');
+        setErrorMessage(error.message);
       }
     );
     return () => unsubscribe();
@@ -290,6 +405,8 @@ const App = () => {
 
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting || !user) return;
+    
     setIsSubmitting(true);
     
     try {
@@ -302,6 +419,8 @@ const App = () => {
       
       if (db && user) {
         await setDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId), finalOrder);
+      } else {
+        throw new Error("Database not ready. Please try again in a moment.");
       }
       
       setLastOrder(finalOrder);
@@ -313,7 +432,7 @@ const App = () => {
       script.onload = () => { if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); };
     } catch (err) {
       console.error("Submission failed:", err);
-      alert("Failed to submit order. Please check your connection.");
+      setErrorMessage(err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -348,112 +467,6 @@ const App = () => {
     }
   };
 
-  // --- UI COMPONENTS ---
-  const SizeSelector = ({ label, value, options, onChange, customValue, onCustomChange }) => (
-    <div className="space-y-3">
-      <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{label}</label>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map(opt => (
-          <button 
-            key={opt} 
-            type="button" 
-            onClick={() => {
-              onChange(opt);
-              if (onCustomChange) onCustomChange(""); 
-            }} 
-            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${value === opt && !customValue ? 'bg-orange-500 text-black border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-slate-950 text-slate-500 border-slate-800 hover:border-slate-700'}`}
-          >
-            {opt}
-          </button>
-        ))}
-      </div>
-      <div className="relative group">
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-orange-500 transition-colors">
-          <Type size={14} />
-        </div>
-        <input 
-          placeholder="Or Enter Custom Size..." 
-          value={customValue}
-          onChange={(e) => onCustomChange(e.target.value)}
-          className={`w-full bg-slate-950/50 border ${customValue ? 'border-orange-500 text-orange-500' : 'border-slate-800 text-slate-400'} p-3 pl-10 rounded-xl text-[10px] outline-none transition-all placeholder:text-slate-800 focus:border-orange-500`}
-        />
-      </div>
-    </div>
-  );
-
-  const SizeChartModal = () => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row h-[85vh] lg:h-auto overflow-y-auto shadow-2xl">
-        <div className="flex-1 p-8 md:p-12 space-y-8">
-          <div className="flex justify-between items-center"><h3 className="text-3xl font-black italic uppercase">Tech Sizing</h3><button onClick={() => setShowSizeChart(false)} className="bg-slate-800 p-3 rounded-full hover:bg-orange-500 transition-all"><X size={20}/></button></div>
-          <div className="flex gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
-            {Object.keys(SIZE_CHARTS).map(t => (
-              <button 
-                key={t} 
-                onClick={() => setActiveChartTab(t)} 
-                className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase transition-all ${activeChartTab === t ? 'bg-orange-500 text-black shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-white'}`}
-              >
-                {t.replace(/([A-Z])/g, ' $1')}
-              </button>
-            ))}
-          </div>
-          <div className="bg-slate-950 rounded-[2rem] overflow-hidden border border-slate-800 shadow-2xl">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-800/40 text-slate-500 uppercase font-black tracking-widest border-b border-slate-800 text-[10px]">
-                  <th className="p-6">Size</th>
-                  {activeChartTab.includes('Jersey') ? (
-                    <><th className="p-6">Width (In)</th><th className="p-6">Height (In)</th></>
-                  ) : (
-                    <><th className="p-6">Waist</th><th className="p-6">Pants Len</th><th className="p-6">Shorts Len</th></>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {SIZE_CHARTS[activeChartTab].map((r, i) => (
-                  <tr key={i} className="border-b border-slate-800/30 hover:bg-white/5 transition-colors text-sm font-bold">
-                    <td className="p-6 font-black text-orange-500 italic">{r.size}</td>
-                    {activeChartTab.includes('Jersey') ? (
-                      <><td className="p-6">{r.width}</td><td className="p-6">{r.height}</td></>
-                    ) : (
-                      <><td className="p-6">{r.waist}</td><td className="p-6">{r.length}</td><td className="p-6">{r.short}</td></>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="w-full md:w-80 bg-slate-950/50 p-8 flex flex-col items-center justify-start gap-6 border-t md:border-t-0 md:border-l border-slate-800 overflow-y-auto">
-           <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest w-full text-center mb-2">How to Measure</p>
-           {activeChartTab.includes('Jersey') ? (
-             <div className="space-y-6 w-full">
-               <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
-                 <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Match Polo</p>
-                 <img src={POLO_MEASURE_IMG} alt="Polo Measurement" className="w-full object-contain" />
-               </div>
-               <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
-                 <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Training T-Shirt</p>
-                 <img src={TSHIRT_MEASURE_IMG} alt="T-Shirt Measurement" className="w-full object-contain" />
-               </div>
-             </div>
-           ) : (
-             <div className="space-y-6 w-full">
-               <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
-                 <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Long Pants</p>
-                 <img src={PANTS_MEASURE_IMG} alt="Pants Measurement" className="w-full object-contain" />
-               </div>
-               <div className="bg-white p-4 rounded-3xl w-full shadow-lg">
-                 <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Shorts</p>
-                 <img src={SHORTS_MEASURE_IMG} alt="Shorts Measurement" className="w-full object-contain" />
-               </div>
-             </div>
-           )}
-        </div>
-      </div>
-    </div>
-  );
-
   // --- VIEWS ---
 
   if (view === 'landing') return (
@@ -461,8 +474,9 @@ const App = () => {
       <div className="absolute inset-0 opacity-5 bg-center bg-cover scale-110" style={{backgroundImage: `url(${MATCH_KIT_IMG})`}}></div>
       
       {dbStatus === 'error' && (
-        <div className="absolute top-4 left-4 bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2">
-          <AlertTriangle size={12}/> Connection Error
+        <div className="absolute top-4 left-4 bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-full text-[10px] font-black uppercase flex flex-col items-start gap-1">
+          <div className="flex items-center gap-2"><AlertTriangle size={12}/> Connection Error</div>
+          {errorMessage && <div className="text-[8px] opacity-60 normal-case">{errorMessage}</div>}
         </div>
       )}
 
@@ -487,11 +501,22 @@ const App = () => {
 
   if (view === 'customize') return (
     <div className="min-h-screen bg-slate-950 text-white p-4 md:p-10 overflow-y-auto font-sans">
-      {showSizeChart && <SizeChartModal />}
+      {showSizeChart && <SizeChartModal activeChartTab={activeChartTab} setActiveChartTab={setActiveChartTab} setShowSizeChart={setShowSizeChart} />}
       <div className="max-w-7xl mx-auto flex justify-between items-center mb-10">
         <button onClick={() => setView('landing')} className="text-slate-400 flex items-center gap-2 hover:text-white transition font-black uppercase text-xs"><ChevronLeft size={20}/> Back</button>
         <button onClick={() => setShowSizeChart(true)} className="bg-slate-900 border border-slate-800 px-8 py-4 rounded-2xl flex items-center gap-3 text-xs font-black uppercase hover:border-orange-500 transition shadow-2xl group"><Ruler size={18} className="text-orange-500 group-hover:rotate-45 transition-transform" /> Tech Sizing Chart</button>
       </div>
+
+      {errorMessage && (
+        <div className="max-w-4xl mx-auto mb-8 bg-red-500/10 border border-red-500/20 p-6 rounded-3xl flex items-center gap-4 text-red-400 font-bold animate-in slide-in-from-top">
+          <AlertTriangle size={24} /> 
+          <div>
+            <p className="text-sm">Submission Error</p>
+            <p className="text-[10px] font-normal opacity-80">{errorMessage}</p>
+          </div>
+          <button onClick={() => setErrorMessage("")} className="ml-auto bg-red-500/20 p-2 rounded-full hover:bg-red-500 hover:text-white transition-all"><X size={16}/></button>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-start">
         <div className="bg-slate-900 p-8 md:p-14 rounded-[3.5rem] border border-slate-800 shadow-2xl space-y-16">
@@ -541,15 +566,15 @@ const App = () => {
                     <div className="grid grid-cols-3 gap-6">
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">Name (Optional)</label>
-                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-pink-600 transition-all" onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-pink-600 transition-all" value={k.name} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">No. (Optional)</label>
-                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-pink-600 transition-all" onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-pink-600 transition-all" value={k.number} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-pink-500 uppercase tracking-[0.2em]">Size (Required)</label>
-                        <select className="w-full bg-slate-900 border border-pink-500/20 p-4 rounded-xl text-xs font-black outline-none appearance-none" onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>
+                        <select className="w-full bg-slate-900 border border-pink-500/20 p-4 rounded-xl text-xs font-black outline-none appearance-none" value={k.size} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>
                           <optgroup label="Adults">{['W-XS','W-S','W-M','W-L'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
                           <optgroup label="Kids">{['9XS','8XS','7XS','6XS','5XS','4XS','3XS','2X'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
                         </select>
@@ -557,7 +582,7 @@ const App = () => {
                     </div>
                     <div className="relative group">
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-orange-500 transition-colors"><Type size={14}/></div>
-                      <input placeholder="Or Enter Custom Size for relative..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
+                      <input placeholder="Or Enter Custom Size for relative..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" value={k.customSize} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
                     </div>
                   </div>
                 ))}
@@ -591,27 +616,33 @@ const App = () => {
                     <div className="grid grid-cols-3 gap-6">
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">Name (Optional)</label>
-                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-yellow-500 transition-all" onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-yellow-500 transition-all" value={k.name} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-slate-700 uppercase tracking-[0.2em]">No. (Optional)</label>
-                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-yellow-500 transition-all" onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
+                        <input placeholder="OPTIONAL" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-yellow-500 transition-all" value={k.number} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-orange-500 uppercase tracking-[0.2em]">Size (Required)</label>
-                        <select className="w-full bg-slate-900 border border-orange-500/20 p-4 rounded-xl text-xs font-black outline-none" onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>{['XS','S','M','L','XL','2XL','3XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</select>
+                        <select className="w-full bg-slate-900 border border-orange-500/20 p-4 rounded-xl text-xs font-black outline-none" value={k.size} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>{['XS','S','M','L','XL','2XL','3XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</select>
                       </div>
                     </div>
                     <div className="relative group">
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-orange-500 transition-colors"><Type size={14}/></div>
-                      <input placeholder="Or Enter Custom Size for this item..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
+                      <input placeholder="Or Enter Custom Size for this item..." className="w-full bg-slate-900/50 border border-slate-800 p-3 pl-10 rounded-xl text-[10px] text-orange-500 outline-none transition-all focus:border-orange-500" value={k.customSize} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, customSize: e.target.value} : x)})} />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <button disabled={isSubmitting || !formData.playerName} type="submit" className="w-full bg-white text-black py-8 rounded-[3rem] font-black text-3xl hover:bg-orange-500 transition-all shadow-2xl disabled:opacity-30 uppercase italic tracking-tighter">{isSubmitting ? 'Confirming...' : 'REGISTER FOR 2026'}</button>
+            <button 
+              disabled={isSubmitting || !formData.playerName || !user} 
+              type="submit" 
+              className="w-full bg-white text-black py-8 rounded-[3rem] font-black text-3xl hover:bg-orange-500 transition-all shadow-2xl disabled:opacity-30 uppercase italic tracking-tighter flex items-center justify-center gap-4"
+            >
+              {isSubmitting ? <><Loader2 className="animate-spin" size={32}/> CONFIRMING...</> : (!user ? "INITIALIZING DB..." : "REGISTER FOR 2026")}
+            </button>
           </form>
         </div>
 
@@ -677,7 +708,7 @@ const App = () => {
             <AlertTriangle size={24} /> 
             <div>
               <p>Warning: Database Sync Error</p>
-              <p className="text-xs font-normal opacity-80 mt-1">Data persistence may be failing. Please check your Firebase console rules or connection.</p>
+              <p className="text-xs font-normal opacity-80 mt-1">Check your Firebase console. (Error: {errorMessage})</p>
             </div>
           </div>
         )}
