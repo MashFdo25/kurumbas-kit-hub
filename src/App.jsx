@@ -12,7 +12,7 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query } from 'firebase/firestore';
 
 // --- ASSETS & CONFIG ---
-const TEAM_LOGO = "Kurumba Logo.jpg";
+const TEAM_LOGO = "Kurumba_Logo.png";
 const FRONT_VIEW_IMG = "Front.jpg";  // Used for Gear References
 const BACK_VIEW_IMG = "Back.jpg";    // Used for Name/Number previews
 
