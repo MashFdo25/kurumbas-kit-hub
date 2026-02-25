@@ -232,13 +232,6 @@ const App = () => {
     setIsAiLoading(false);
   };
 
-  const generateAdminBrief = async () => {
-    setIsAdminAiLoading(true);
-    const res = await callGemini(`Brief for ${orders.length} orders at Kurumbas CC.`, "Logistics.");
-    if (res) setAdminAiBrief(res);
-    setIsAdminAiLoading(false);
-  };
-
   const exportManufacturerReport = async () => {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js');
@@ -307,13 +300,58 @@ const App = () => {
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Squad #</label><input required type="number" placeholder="00" value={formData.number || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-black text-2xl" onChange={e => setFormData({...formData, number: e.target.value})} /></div>
               </div>
             </div>
+            
             <div className="space-y-10">
               <div className="flex items-center gap-4 border-b border-slate-800 pb-5"><div className="bg-orange-500 p-3 rounded-2xl shadow-inner"><Shirt size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">2. Squad Sizing</h3></div>
               <div className="grid md:grid-cols-2 gap-12 pt-4">
-                <SizeSelector label="Jersey Size" value={formData.jerseySize} options={['XS','S','M','L','XL','2XL','3XL']} onChange={v => setFormData(prev => ({...prev, jerseySize: v}))} customValue={formData.customJerseySize} onCustomChange={val => setFormData(prev => ({...prev, customJerseySize: val}))} />
+                <SizeSelector label="Jersey Size (Match & Training)" value={formData.jerseySize} options={['XS','S','M','L','XL','2XL','3XL']} onChange={v => setFormData(prev => ({...prev, jerseySize: v}))} customValue={formData.customJerseySize} onCustomChange={val => setFormData(prev => ({...prev, customJerseySize: val}))} />
                 <SizeSelector label="Long Pants" value={formData.pantSize} options={['XS','S','M','L','XL','2XL','3XL']} onChange={v => setFormData(prev => ({...prev, pantSize: v}))} customValue={formData.customPantSize} onCustomChange={val => setFormData(prev => ({...prev, customPantSize: val}))} />
+                <SizeSelector label="Shorts Size" value={formData.shortSize} options={['XS','S','M','L','XL','2XL','3XL']} onChange={v => setFormData(prev => ({...prev, shortSize: v}))} customValue={formData.customShortSize} onCustomChange={val => setFormData(prev => ({...prev, customShortSize: val}))} />
+                <SizeSelector label="Training Skinny" value={formData.skinnySize} options={['XS','S','M','L','XL','2XL','3XL']} onChange={v => setFormData(prev => ({...prev, skinnySize: v}))} customValue={formData.customSkinnySize} onCustomChange={val => setFormData(prev => ({...prev, customSkinnySize: val}))} />
               </div>
             </div>
+
+            <div className="space-y-10">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-5">
+                <div className="flex items-center gap-4"><div className="bg-pink-600 p-3 rounded-2xl"><Heart size={24} className="text-white"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic text-pink-500">3. Family Support</h3></div>
+                <button type="button" onClick={() => setFormData({...formData, familyKits: [...(formData.familyKits || []), { id: Date.now(), name: '', number: '', size: 'W-M', customSize: '' }]})} className="bg-pink-600/10 border border-pink-600/20 text-pink-500 px-6 py-3 rounded-2xl text-xs font-black uppercase flex items-center gap-2 hover:bg-pink-600 hover:text-white shadow-xl"><PlusCircle size={18}/> Add Member</button>
+              </div>
+              <div className="space-y-6">
+                {(formData.familyKits || []).map(k => (
+                  <div key={k.id} className="bg-slate-950 p-8 rounded-[2.5rem] border border-slate-800 flex flex-col gap-6 relative">
+                    <button type="button" onClick={() => setFormData({...formData, familyKits: formData.familyKits.filter(x => x.id !== k.id)})} className="absolute -top-3 -right-3 bg-slate-800 p-2.5 rounded-full text-slate-600 hover:text-red-500 border border-slate-700"><Trash2 size={18}/></button>
+                    <div className="grid grid-cols-3 gap-6">
+                      <input placeholder="NAME" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-pink-600" value={k.name || ""} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
+                      <input placeholder="NO" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-pink-600" value={k.number || ""} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
+                      <select className="w-full bg-slate-900 border border-pink-500/20 p-4 rounded-xl text-xs font-black outline-none" value={k.size || "W-M"} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>
+                        <optgroup label="Adults">{['W-XS','W-S','W-M','W-L'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
+                        <optgroup label="Kids">{['9XS','8XS','7XS','6XS','5XS','4XS','3XS','2X'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-10">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-5">
+                <div className="flex items-center gap-4"><div className="bg-yellow-500 p-3 rounded-2xl"><ShoppingBag size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">4. Extra Gear</h3></div>
+                <button type="button" onClick={() => setFormData({...formData, extraPaidJerseys: [...(formData.extraPaidJerseys || []), { id: Date.now(), name: '', number: '', size: 'M', customSize: '' }]})} className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-6 py-3 rounded-2xl text-xs font-black uppercase flex items-center gap-2 hover:bg-yellow-500 hover:text-black shadow-xl"><PlusCircle size={18}/> Order Extra</button>
+              </div>
+              <div className="space-y-6">
+                {(formData.extraPaidJerseys || []).map(k => (
+                  <div key={k.id} className="bg-slate-950 p-8 rounded-[2.5rem] border border-slate-800 flex flex-col gap-6 relative">
+                    <button type="button" onClick={() => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.filter(x => x.id !== k.id)})} className="absolute -top-3 -right-3 bg-slate-800 p-2.5 rounded-full text-slate-600 hover:text-red-500 border border-slate-700"><Trash2 size={18}/></button>
+                    <div className="grid grid-cols-3 gap-6">
+                      <input placeholder="NAME" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs uppercase font-black outline-none focus:border-yellow-500" value={k.name || ""} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, name: e.target.value} : x)})} />
+                      <input placeholder="NO" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-yellow-500" value={k.number || ""} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
+                      <select className="w-full bg-slate-900 border border-orange-500/20 p-4 rounded-xl text-xs font-black outline-none" value={k.size || "M"} onChange={e => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>{['XS','S','M','L','XL','2XL','3XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <button disabled={isSubmitting || !formData.playerName} type="submit" className="w-full bg-white text-black py-8 rounded-[3rem] font-black text-3xl hover:bg-orange-500 transition-all shadow-2xl disabled:opacity-30 uppercase italic flex items-center justify-center gap-4">
               {isSubmitting ? <><Loader2 className="animate-spin" size={32}/> CONFIRMING...</> : (editingOrder ? "UPDATE REGISTRATION" : "REGISTER FOR 2026")}
             </button>
@@ -371,12 +409,22 @@ const App = () => {
         <div className="bg-slate-900 rounded-[3rem] border border-slate-800 overflow-hidden shadow-2xl">
           <div className="p-10 border-b border-slate-800 bg-slate-800/20 flex flex-col md:flex-row gap-6 justify-between items-center"><h4 className="text-xl font-black uppercase flex items-center gap-4"><FileText size={24} className="text-orange-500" /> Sponsoring Manifest</h4><div className="flex gap-4"><div className="relative group w-full md:w-64"><Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" /><input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-950 border border-slate-800 pl-10 pr-4 py-2 rounded-xl text-xs outline-none focus:border-orange-500" /></div><button onClick={exportManufacturerReport} className="bg-white text-black px-6 py-2 rounded-xl text-[10px] font-black uppercase">PDF Report</button></div></div>
           <table className="w-full text-left">
-              <thead><tr className="bg-slate-950/50 text-slate-500 text-[10px] font-black uppercase border-b border-slate-800 tracking-widest"><th className="p-10">Member</th><th className="p-10">Sizing Config</th><th className="p-10 text-right">Actions</th></tr></thead>
+              <thead><tr className="bg-slate-950/50 text-slate-500 text-[10px] font-black uppercase border-b border-slate-800 tracking-widest"><th className="p-10">Member</th><th className="p-10">Sizing Config</th><th className="p-10">Add-Ons</th><th className="p-10 text-right">Actions</th></tr></thead>
               <tbody className="divide-y divide-slate-800/50">
                 {filteredOrders.map(o => (
                   <tr key={o.id} className="text-white hover:bg-slate-800/10">
                     <td className="p-10"><p className="font-black text-2xl italic uppercase leading-none mb-2">{o.playerName}</p><span className="text-orange-500 font-black text-xs uppercase tracking-widest">{o.jerseyName} #{o.number}</span></td>
-                    <td className="p-10"><span className="bg-slate-950 px-3 py-1.5 rounded-lg text-[10px] font-black border border-slate-800">J:{o.customJerseySize || o.jerseySize} P:{o.customPantSize || o.pantSize}</span></td>
+                    <td className="p-10"><div className="flex flex-wrap gap-2">
+                        {['jersey', 'pant', 'short', 'skinny'].map(type => (
+                            <span key={type} className="bg-slate-950 px-3 py-1.5 rounded-lg text-[9px] font-black border border-slate-800 text-slate-400 uppercase">
+                                {type.charAt(0)}: {o[`custom${type.charAt(0).toUpperCase() + type.slice(1)}Size`] || o[`${type}Size`]}
+                            </span>
+                        ))}
+                    </div></td>
+                    <td className="p-10"><div className="flex gap-2">
+                        {o.familyKits?.length > 0 && <span className="bg-pink-500/10 text-pink-500 px-3 py-1.5 rounded-lg text-[9px] font-black border border-pink-500/20">FAM: {o.familyKits.length}</span>}
+                        {o.extraPaidJerseys?.length > 0 && <span className="bg-yellow-500/10 text-yellow-500 px-3 py-1.5 rounded-lg text-[9px] font-black border border-yellow-500/20">PAID: {o.extraPaidJerseys.length}</span>}
+                    </div></td>
                     <td className="p-10 text-right space-x-2"><button onClick={() => handleEditOrder(o)} className="bg-slate-800 p-4 rounded-xl text-slate-500 hover:text-orange-500"><Edit3 size={20}/></button><button onClick={() => handleDeleteOrder(o.id)} className="bg-slate-800 p-4 rounded-xl text-slate-500 hover:text-red-500"><Trash2 size={20}/></button></td>
                   </tr>
                 ))}
