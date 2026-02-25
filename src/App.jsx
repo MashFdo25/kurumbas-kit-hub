@@ -9,14 +9,14 @@ import {
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 // --- ASSETS & CONFIG ---
-const TEAM_LOGO = "Kurumba Logo.jpg";
+const TEAM_LOGO = "Kurumba_Logo.png";
 const FRONT_VIEW_IMG = "Front.jpg";  // Used for Gear References (Match Polo / Vest)
-const BACK_VIEW_IMG = "Back.jpg";    // Used for Name/Number previews
+const BACK_VIEW_IMG = "Back.jpg";    // Used for Name/Number previews (Jersey Card / Signing Card)
 
-// Logic mapping based on your request
+// Logic mapping as requested
 const MATCH_KIT_IMG = FRONT_VIEW_IMG;
 const TRAINING_KIT_IMG = FRONT_VIEW_IMG;
 const PREVIEW_CARD_IMG = BACK_VIEW_IMG;
@@ -26,26 +26,34 @@ const TSHIRT_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.58 PM.png";
 const PANTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.50 PM.png";
 const SHORTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.10.08 PM.png";
 
-// Hardcoded for compatibility with the preview environment and to avoid import.meta errors
-const apiKey = "gen-lang-client-0867680743"; 
+// Environment variables configuration for Netlify
+// Safe access pattern to prevent compilation errors in non-Vite environments
+const getEnv = (key) => {
+  try {
+    return import.meta.env[key] || "";
+  } catch (e) {
+    return "";
+  }
+};
+
+const apiKey = getEnv('VITE_GEMINI_API_KEY');
 const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
 
 // --- DATABASE CONFIGURATION ---
-// Hardcoded values to ensure the "Preview" and "Register" logic work immediately without compilation errors
 const firebaseConfig = {
-  apiKey: "AIzaSyCxUk4hWuP0xCPyYupkjK28e419fgfUb1w",
-  authDomain: "kurumbaskithub.firebaseapp.com",
-  projectId: "kurumbaskithub",
-  storageBucket: "kurumbaskithub.firebasestorage.app",
-  messagingSenderId: "1075784604577",
-  appId: "1:1075784604577:web:152e6b5863011a214509e0"
+  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
+  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnv('VITE_FIREBASE_APP_ID')
 };
 
-// Initialize Firebase services outside the component
+// Initialize Firebase services outside the component to ensure stability
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const projectAppId = typeof __app_id !== 'undefined' ? __app_id : 'kurumbas-kit-hub';
+const projectAppId = "kurumbas-kit-hub";
 
 // --- EXACT MANUFACTURER DATA ---
 const SIZE_CHARTS = {
@@ -79,7 +87,7 @@ const SIZE_CHARTS = {
   ]
 };
 
-// --- STABLE SUB-COMPONENTS (Defined outside App to prevent focus loss) ---
+// --- STABLE SUB-COMPONENTS (Defined outside App to prevent focus loss while typing) ---
 
 const SizeSelector = ({ label, value, options, onChange, customValue, onCustomChange }) => (
   <div className="space-y-3">
@@ -242,7 +250,7 @@ const App = () => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Handle environment priority
+        // Use initial token if provided by environment, else sign in anonymously for public users
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
@@ -250,7 +258,7 @@ const App = () => {
         }
       } catch (err) { 
         console.error("Firebase Auth Error:", err); 
-        setErrorMessage("Database Authentication Failed. Please check if Anonymous sign-in is enabled in Firebase.");
+        setErrorMessage("Database Authentication Error. Please ensure variables are set in Netlify.");
         setDbStatus('error'); 
       }
     };
@@ -269,17 +277,19 @@ const App = () => {
   useEffect(() => {
     if (!user) return;
     
+    // Real-time listener following RULE 1
     const ordersRef = collection(db, 'artifacts', projectAppId, 'public', 'data', 'orders');
     const unsubscribe = onSnapshot(ordersRef, 
       (snapshot) => {
         const fetchedOrders = [];
         snapshot.forEach(doc => fetchedOrders.push({ id: doc.id, ...doc.data() }));
+        // RULE 2: Sort locally
         setOrders(fetchedOrders.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0)));
       }, 
       (error) => {
         console.error("Firestore Listen Error:", error);
         setDbStatus('error');
-        setErrorMessage("Live Sync Error: " + error.message);
+        setErrorMessage("Sync Error: " + error.message);
       }
     );
     return () => unsubscribe();
@@ -445,9 +455,9 @@ const App = () => {
       };
       
       if (db && user) {
-        // Defensive race against timeout to prevent UI hang
+        // Defensive race against timeout
         const writePromise = setDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId), finalOrder);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database write timed out.")), 10000));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database write timed out. Check connection.")), 10000));
 
         await Promise.race([writePromise, timeoutPromise]);
         
@@ -459,7 +469,7 @@ const App = () => {
         document.head.appendChild(script);
         script.onload = () => { if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); };
       } else {
-        throw new Error("No Active Database Connection.");
+        throw new Error("No Database Connection");
       }
     } catch (err) {
       console.error("Submission failed:", err);
@@ -710,11 +720,11 @@ const App = () => {
         <div className="absolute inset-0 p-16 flex flex-col justify-end text-left">
           <img src={TEAM_LOGO} className="w-24 h-24 mb-10" />
           <span className="bg-orange-500 text-black px-6 py-2 text-[11px] font-black uppercase tracking-widest w-fit mb-8 rounded-full">Official Signing 2026</span>
-          <h2 className="text-8xl font-black italic tracking-tighter uppercase leading-none mb-4">{lastOrder?.jerseyName}</h2>
-          <div className="flex items-center gap-8"><div className="h-1 w-24 bg-orange-500"></div><span className="text-orange-500 font-black text-7xl italic">#{lastOrder?.number}</span></div>
+          <h2 className="text-8xl font-black italic tracking-tighter uppercase leading-none mb-4">{lastOrder?.jerseyName || "JOHN"}</h2>
+          <div className="flex items-center gap-8"><div className="h-1 w-24 bg-orange-500"></div><span className="text-orange-500 font-black text-7xl italic">#{lastOrder?.number || "00"}</span></div>
         </div>
       </div>
-      <div className="flex gap-6"><button onClick={() => handleDownload('share-card', `${lastOrder?.jerseyName}_KCC.png`)} className="bg-white text-black px-16 py-6 rounded-[3rem] font-black text-lg uppercase flex items-center gap-4 hover:bg-orange-500 transition-all shadow-2xl active:scale-95"><Share2 size={24}/> Share My Signing</button><button onClick={() => setView('landing')} className="bg-slate-900 text-slate-500 px-12 py-6 rounded-[3rem] font-black text-lg uppercase hover:text-white transition-all">Home</button></div>
+      <div className="flex gap-6"><button onClick={() => handleDownload('share-card', `${lastOrder?.jerseyName || 'KCC'}_Signing.png`)} className="bg-white text-black px-16 py-6 rounded-[3rem] font-black text-lg uppercase flex items-center gap-4 hover:bg-orange-500 transition-all shadow-2xl active:scale-95"><Share2 size={24}/> Share My Signing</button><button onClick={() => setView('landing')} className="bg-slate-900 text-slate-500 px-12 py-6 rounded-[3rem] font-black text-lg uppercase hover:text-white transition-all">Home</button></div>
     </div>
   );
 
@@ -739,7 +749,7 @@ const App = () => {
             <AlertTriangle size={24} /> 
             <div>
               <p>Warning: Database Sync Error</p>
-              <p className="text-xs font-normal opacity-80 mt-1">Check your Firebase console settings. (Error: {errorMessage})</p>
+              <p className="text-xs font-normal opacity-80 mt-1">Check Netlify environment variables and Firebase Auth settings.</p>
             </div>
           </div>
         )}
@@ -757,8 +767,6 @@ const App = () => {
               <p className="text-[9px] text-pink-500 font-bold uppercase mt-4">Extra/Fam Names & Nos</p>
            </div>
         </div>
-
-        {adminAiBrief && <div className="bg-orange-500/5 border border-orange-500/20 p-12 rounded-[5rem] animate-in zoom-in relative shadow-2xl"><button onClick={() => setAdminAiBrief("")} className="absolute top-12 right-12 text-slate-500 hover:text-white"><X size={32}/></button><div className="flex items-center gap-6 mb-10"><Sparkles className="text-orange-500" size={40}/><h3 className="text-3xl font-black uppercase italic tracking-widest text-white">Production Brief</h3></div><div className="bg-black/50 p-12 rounded-[3.5rem] font-mono text-sm leading-relaxed text-slate-300 border border-white/5 whitespace-pre-wrap">{adminAiBrief}</div><button onClick={() => window.location.href = `mailto:supplier@kits.com?body=${encodeURIComponent(adminAiBrief)}`} className="mt-10 bg-white text-black px-10 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-3 hover:bg-orange-500 transition-colors shadow-2xl">Push to Manufacturer</button></div>}
 
         <div className="bg-slate-900 rounded-[5rem] border border-slate-800 overflow-hidden shadow-2xl">
           <div className="p-12 border-b border-slate-800 bg-slate-800/20 flex flex-col md:flex-row gap-6 justify-between items-center">
