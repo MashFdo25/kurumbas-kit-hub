@@ -374,7 +374,7 @@ const App = () => {
               <div className="bg-yellow-500/5 border border-yellow-500/10 p-6 rounded-3xl flex items-center gap-4">
                 <Banknote size={24} className="text-yellow-500 shrink-0" />
                 {/* Dynamically displaying updated admin price */}
-                <p className="text-xs text-yellow-500/80 font-black uppercase tracking-widest leading-relaxed">Unit Cost: ${extraJerseyPrice} (Sponsorship limit exceeded item)</p>
+                <p className="text-xs text-yellow-500/80 font-black uppercase tracking-widest leading-relaxed">Unit Cost: ${extraJerseyPrice}</p>
               </div>
               <div className="space-y-6">
                 {(formData.extraPaidJerseys || []).map(k => (
