@@ -1,49 +1,33 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Trophy, 
-  Users, 
-  Settings, 
-  Download, 
-  CheckCircle2, 
-  AlertCircle, 
-  ChevronRight, 
-  Trash2, 
-  X, 
-  Share2, 
-  Lock, 
-  Camera, 
-  Plus, 
-  Heart, 
-  Shirt, 
-  BarChart3, 
-  FileText, 
-  Ruler, 
-  Info, 
-  Sparkles, 
-  Wand2, 
-  Send,
-  ShoppingBag,
-  ArrowRight,
-  ChevronLeft,
-  Layout,
-  Type,
-  PlusCircle,
-  Banknote,
-  FileSpreadsheet
+  Users, Lock, PlusCircle, Trash2, X, Share2, Heart, Shirt, 
+  FileText, Ruler, Sparkles, Wand2, ShoppingBag, ArrowRight, 
+  ChevronLeft, Layout, Type, Banknote, FileSpreadsheet, Download,
+  CheckCircle2, AlertTriangle, Database
 } from 'lucide-react';
 
+// --- FIREBASE IMPORTS ---
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query } from 'firebase/firestore';
+
 // --- ASSETS & CONFIG ---
-const TEAM_LOGO = "Kurumba_Logo.png";
-const MATCH_KIT_IMG = "Back.jpg";
-const TRAINING_KIT_IMG = "Front.jpg";
+const TEAM_LOGO = "Kurumba Logo.jpg";
+const FRONT_VIEW_IMG = "Front.jpg";  // Used for Gear References
+const BACK_VIEW_IMG = "Back.jpg";    // Used for Name/Number previews
+
+// For internal logic mapping
+const MATCH_KIT_IMG = FRONT_VIEW_IMG;
+const TRAINING_KIT_IMG = FRONT_VIEW_IMG;
+const PREVIEW_CARD_IMG = BACK_VIEW_IMG;
 
 const POLO_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.21 PM.png";
 const TSHIRT_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.58 PM.png";
 const PANTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.50 PM.png";
 const SHORTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.10.08 PM.png";
 
-const BUDGET_LIMIT = 1000000;
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+// Hardcoded for preview compatibility. For Netlify deployment, use import.meta.env
+const apiKey = "gen-lang-client-0867680743"; 
 const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
 
 // --- SCRIPT LOADER ---
@@ -57,6 +41,23 @@ const loadScript = (src) => {
     document.head.appendChild(script);
   });
 };
+
+// --- DATABASE CONFIGURATION ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "AIzaSyCxUk4hWuP0xCPyYupkjK28e419fgfUb1w",
+      authDomain: "kurumbaskithub.firebaseapp.com",
+      projectId: "kurumbaskithub",
+      storageBucket: "kurumbaskithub.firebasestorage.app",
+      messagingSenderId: "1075784604577",
+      appId: "1:1075784604577:web:152e6b5863011a214509e0"
+    };
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const projectAppId = typeof __app_id !== 'undefined' ? __app_id : 'kurumbas-kit-hub';
 
 // --- EXACT MANUFACTURER DATA ---
 const SIZE_CHARTS = {
@@ -86,7 +87,7 @@ const SIZE_CHARTS = {
     { size: 'L', waist: '30/32', length: '40"', short: '19"' },
     { size: 'XL', waist: '34/36', length: '40.5"', short: '20"' },
     { size: '2XL', waist: '34/36', length: '40.5"', short: '20"' },
-    { size: '3XL', waist: '38/40', length: '41.25"', short: '21"' },
+    { size: '3XL', width: '38/40', length: '41.25"', short: '21"' },
   ]
 };
 
@@ -97,55 +98,18 @@ const App = () => {
   const [activeChartTab, setActiveChartTab] = useState('adultJersey');
   const [extraJerseyPrice, setExtraJerseyPrice] = useState(2800);
   
-  const [orders, setOrders] = useState([
-    {
-      id: 1708800000001,
-      playerName: 'Jude Fernando',
-      jerseyName: 'MADHUSHA',
-      number: '23',
-      jerseySize: 'L', customJerseySize: '',
-      pantSize: 'L', customPantSize: '',
-      shortSize: 'M', customShortSize: '',
-      skinnySize: 'M', customSkinnySize: '',
-      familyKits: [
-        { id: 101, name: 'Kian', number: '10', size: '7XS', customSize: '' },
-        { id: 102, name: 'Kriska', number: '08', size: '6XS', customSize: '' },
-        { id: 103, name: 'Priyashi', number: '', size: 'W-M', customSize: '' }
-      ],
-      extraPaidJerseys: [],
-      currentPriceAtOrder: 2800
-    },
-    {
-      id: 1708800000002,
-      playerName: 'Thaal',
-      jerseyName: 'THAAL',
-      number: '07',
-      jerseySize: 'M', customJerseySize: '',
-      pantSize: 'M', customPantSize: '32',
-      shortSize: 'M', customShortSize: '',
-      skinnySize: 'M', customSkinnySize: '',
-      familyKits: [],
-      extraPaidJerseys: [
-        { id: 201, name: 'SARA', number: '07', size: 'S', customSize: '' }
-      ],
-      currentPriceAtOrder: 2800
-    }
-  ]);
-  
+  // App State
+  const [orders, setOrders] = useState([]);
+  const [user, setUser] = useState(null);
+  const [dbStatus, setDbStatus] = useState('connecting');
+
   const [formData, setFormData] = useState({
-    playerName: '',
-    jerseyName: '',
-    number: '',
-    jerseySize: 'M',
-    customJerseySize: '',
-    pantSize: 'M',
-    customPantSize: '',
-    shortSize: 'M',
-    customShortSize: '',
-    skinnySize: 'M',
-    customSkinnySize: '',
-    familyKits: [], 
-    extraPaidJerseys: []
+    playerName: '', jerseyName: '', number: '',
+    jerseySize: 'M', customJerseySize: '',
+    pantSize: 'M', customPantSize: '',
+    shortSize: 'M', customShortSize: '',
+    skinnySize: 'M', customSkinnySize: '',
+    familyKits: [], extraPaidJerseys: []
   });
 
   const [lastOrder, setLastOrder] = useState(null);
@@ -163,6 +127,47 @@ const App = () => {
       return sum + familyPrints + extraPrints;
     }, 0);
   }, [orders]);
+
+  // --- DATABASE LOGIC (FIREBASE) ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) { 
+        console.error("Firebase Auth Error:", err); 
+        setDbStatus('error'); 
+      }
+    };
+    initAuth();
+    
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (u) setDbStatus('connected');
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const ordersRef = collection(db, 'artifacts', projectAppId, 'public', 'data', 'orders');
+    const unsubscribe = onSnapshot(ordersRef, 
+      (snapshot) => {
+        const fetchedOrders = [];
+        snapshot.forEach(doc => fetchedOrders.push({ id: doc.id, ...doc.data() }));
+        setOrders(fetchedOrders.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      }, 
+      (error) => {
+        console.error("Firestore Listen Error:", error);
+        setDbStatus('error');
+      }
+    );
+    return () => unsubscribe();
+  }, [user]);
 
   // --- API LOGIC (Gemini) ---
   const callGemini = async (prompt, systemInstruction = "", retryCount = 0) => {
@@ -188,7 +193,7 @@ const App = () => {
   const generateAIPersona = async () => {
     if (!formData.playerName) return;
     setIsAiLoading(true);
-    const prompt = `Suggest 3 high-energy jersey nicknames for "${formData.playerName}". Return format: NAME1, NAME2, NAME3`;
+    const prompt = `Suggest 3 high-energy jersey nicknames for a Sri Lankan player named "${formData.playerName}". Return format: NAME1, NAME2, NAME3`;
     const res = await callGemini(prompt, "Creative sports branding assistant.");
     if (res) setAiSuggestions(res.split(',').map(n => n.trim().toUpperCase()));
     setIsAiLoading(false);
@@ -196,7 +201,6 @@ const App = () => {
 
   const generateAdminBrief = async () => {
     setIsAdminAiLoading(true);
-    const summary = JSON.stringify(orders);
     const prompt = `Analyze these ${orders.length} orders for Kurumbas CC. Create a production summary. Highlight custom sizes, additional paid jerseys, and specifically mention that ${totalPrintsRequired} extra/family jerseys require custom name/number printing.`;
     const res = await callGemini(prompt, "Logistics Manager.");
     if (res) setAdminAiBrief(res);
@@ -213,7 +217,6 @@ const App = () => {
     doc.setFontSize(18);
     doc.text("Kurumbas CC - Manufacturer Order Report", 14, 20);
     
-    // Add summary stats to the top of the PDF
     doc.setFontSize(10);
     doc.text(`Total Squad Bundles: ${orders.length}  |  Family Jerseys: ${orders.reduce((s,o)=>s+o.familyKits.length,0)}  |  Extra Paid Gear: ${orders.reduce((s,o)=>s+o.extraPaidJerseys.length,0)}  |  Extra/Family Prints Req: ${totalPrintsRequired}`, 14, 28);
 
@@ -237,13 +240,8 @@ const App = () => {
         return `1x ${details.join(' | ')}`;
       };
 
-      const family = o.familyKits.length > 0 
-        ? o.familyKits.map(formatKitItem).join('\n\n') 
-        : "-";
-        
-      const extra = o.extraPaidJerseys.length > 0
-        ? o.extraPaidJerseys.map(formatKitItem).join('\n\n')
-        : "-";
+      const family = o.familyKits.length > 0 ? o.familyKits.map(formatKitItem).join('\n\n') : "-";
+      const extra = o.extraPaidJerseys.length > 0 ? o.extraPaidJerseys.map(formatKitItem).join('\n\n') : "-";
 
       return [o.playerName, printDetails, squadSizes, family, extra];
     });
@@ -290,21 +288,47 @@ const App = () => {
     XLSX.writeFile(workbook, "Kurumbas_CC_Manufacturer_Report.xlsx");
   };
 
-  const handleOrderSubmit = (e) => {
+  const handleOrderSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTimeout(() => {
-      const finalOrder = { ...formData, id: Date.now(), currentPriceAtOrder: extraJerseyPrice };
-      setOrders(prev => [...prev, finalOrder]);
+    
+    try {
+      const orderId = Date.now().toString();
+      const finalOrder = { 
+        ...formData, 
+        currentPriceAtOrder: extraJerseyPrice,
+        timestamp: Date.now()
+      };
+      
+      if (db && user) {
+        await setDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId), finalOrder);
+      }
+      
       setLastOrder(finalOrder);
-      setIsSubmitting(false);
       setView('success');
       
       const script = document.createElement('script');
       script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
       document.head.appendChild(script);
       script.onload = () => { if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); };
-    }, 1500);
+    } catch (err) {
+      console.error("Submission failed:", err);
+      alert("Failed to submit order. Please check your connection.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (window.confirm("Are you sure you want to delete this order?")) {
+      try {
+        if (db && user) {
+          await deleteDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId));
+        }
+      } catch (err) {
+        console.error("Delete failed:", err);
+      }
+    }
   };
 
   const handleDownload = async (elementId, filename) => {
@@ -435,6 +459,13 @@ const App = () => {
   if (view === 'landing') return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center overflow-hidden relative font-sans">
       <div className="absolute inset-0 opacity-5 bg-center bg-cover scale-110" style={{backgroundImage: `url(${MATCH_KIT_IMG})`}}></div>
+      
+      {dbStatus === 'error' && (
+        <div className="absolute top-4 left-4 bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2">
+          <AlertTriangle size={12}/> Connection Error
+        </div>
+      )}
+
       <div className="z-10 flex flex-col items-center max-w-4xl">
         <img src={TEAM_LOGO} className="w-40 h-40 md:w-56 md:h-56 mb-12 drop-shadow-[0_0_60px_rgba(249,115,22,0.4)]" />
         <h1 className="text-7xl md:text-[10rem] font-black text-white italic tracking-tighter uppercase mb-8 leading-none select-none">
@@ -588,7 +619,7 @@ const App = () => {
           <div id="jersey-preview" className="relative group perspective-1000">
              <div className="absolute -inset-20 bg-orange-500/10 blur-[150px] rounded-full opacity-30"></div>
              <div className="relative w-[380px] h-[520px] md:w-[440px] md:h-[600px] bg-slate-900 rounded-t-[100px] shadow-[0_80px_160px_rgba(0,0,0,0.9)] overflow-hidden border-b-[60px] border-black transition-all duration-700 hover:rotate-y-6">
-                <div className="absolute inset-0 bg-cover bg-top" style={{backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${MATCH_KIT_IMG})`}}></div>
+                <div className="absolute inset-0 bg-cover bg-top" style={{backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${PREVIEW_CARD_IMG})`}}></div>
                 <div className="absolute top-[28%] w-full flex flex-col items-center px-12 text-center">
                    <h2 className="text-white font-black text-4xl md:text-5xl tracking-tighter uppercase drop-shadow-[0_5px_15px_rgba(0,0,0,1)] break-all leading-tight mb-4">{formData.jerseyName || "PLAYER"}</h2>
                    <span className="text-[#D4AF37] font-black text-[180px] md:text-[240px] leading-[0.7] drop-shadow-[0_10px_60px_rgba(0,0,0,1)] italic">{formData.number || "00"}</span>
@@ -599,8 +630,8 @@ const App = () => {
           <div className="w-full bg-slate-900 p-8 rounded-[3.5rem] border border-slate-800 shadow-2xl space-y-8">
              <div className="flex items-center gap-3 border-b border-slate-800 pb-4"><Layout size={18} className="text-orange-500" /><h4 className="text-sm font-black uppercase italic tracking-widest text-slate-300 leading-none">Gear Reference</h4></div>
              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><div className="h-40 rounded-3xl overflow-hidden border border-slate-800 grayscale hover:grayscale-0 transition-all duration-500"><img src={MATCH_KIT_IMG} className="w-full h-full object-cover" /></div><p className="text-[9px] text-center font-black text-slate-600 uppercase tracking-widest italic">Match Polo</p></div>
-                <div className="space-y-2"><div className="h-40 rounded-3xl overflow-hidden border border-slate-800 grayscale hover:grayscale-0 transition-all duration-500"><img src={TRAINING_KIT_IMG} className="w-full h-full object-cover" /></div><p className="text-[9px] text-center font-black text-slate-600 uppercase tracking-widest italic">Training Vest</p></div>
+                <div className="space-y-2"><div className="h-40 rounded-3xl overflow-hidden border border-slate-800 grayscale hover:grayscale-0 transition-all duration-500"><img src={FRONT_VIEW_IMG} className="w-full h-full object-cover" /></div><p className="text-[9px] text-center font-black text-slate-600 uppercase tracking-widest italic">Match Polo</p></div>
+                <div className="space-y-2"><div className="h-40 rounded-3xl overflow-hidden border border-slate-800 grayscale hover:grayscale-0 transition-all duration-500"><img src={FRONT_VIEW_IMG} className="w-full h-full object-cover" /></div><p className="text-[9px] text-center font-black text-slate-600 uppercase tracking-widest italic">Training Vest</p></div>
              </div>
           </div>
         </div>
@@ -613,7 +644,7 @@ const App = () => {
       <div className="bg-green-500 p-10 rounded-full mb-12 shadow-[0_0_120px_rgba(34,197,94,0.4)] animate-bounce"><CheckCircle2 size={80}/></div>
       <h1 className="text-8xl md:text-9xl font-black italic uppercase mb-8 tracking-tighter leading-none">LOCKED <span className="text-orange-500">IN.</span></h1>
       <div id="share-card" className="w-[360px] h-[640px] bg-black rounded-[4rem] overflow-hidden relative shadow-[0_60px_140px_rgba(0,0,0,1)] border border-white/5 mb-10">
-        <div className="absolute inset-0 bg-cover bg-top opacity-80" style={{backgroundImage: `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.9)), url(${MATCH_KIT_IMG})`}}></div>
+        <div className="absolute inset-0 bg-cover bg-top opacity-80" style={{backgroundImage: `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.9)), url(${PREVIEW_CARD_IMG})`}}></div>
         <div className="absolute inset-0 p-16 flex flex-col justify-end text-left">
           <img src={TEAM_LOGO} className="w-24 h-24 mb-10" />
           <span className="bg-orange-500 text-black px-6 py-2 text-[11px] font-black uppercase tracking-widest w-fit mb-8 rounded-full">Official Signing 2026</span>
@@ -641,6 +672,16 @@ const App = () => {
       <div className="max-w-7xl mx-auto space-y-20">
         <div className="flex justify-between items-end"><h1 className="text-6xl font-black text-orange-500 uppercase italic tracking-tighter leading-none">Control</h1><div className="flex gap-6"><button onClick={generateAdminBrief} disabled={isAdminAiLoading} className="bg-orange-500 text-black px-10 py-4 rounded-[2rem] text-sm font-black uppercase flex items-center gap-4 hover:scale-105 transition-all italic">{isAdminAiLoading ? <Wand2 className="animate-spin" size={20}/> : <Sparkles size={20}/>} ✨ AI Brief</button><button onClick={() => setView('landing')} className="bg-slate-800 p-5 rounded-[2rem] hover:text-white transition-all shadow-xl"><X size={32}/></button></div></div>
         
+        {dbStatus === 'error' && (
+          <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-3xl flex items-center gap-4 text-red-400 font-bold">
+            <AlertTriangle size={24} /> 
+            <div>
+              <p>Warning: Database Sync Error</p>
+              <p className="text-xs font-normal opacity-80 mt-1">Data persistence may be failing. Please check your Firebase console rules or connection.</p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
            <div className="bg-slate-900 p-12 rounded-[4rem] border border-slate-800 shadow-2xl flex flex-col justify-between">
               <div><p className="text-[11px] opacity-40 uppercase font-black mb-5 tracking-widest">Extra Price</p><input type="number" value={extraJerseyPrice} className="bg-slate-950 border border-orange-500/30 p-3 rounded-xl text-3xl font-black w-full outline-none focus:border-orange-500 transition-all" onChange={(e) => setExtraJerseyPrice(Number(e.target.value))} /></div>
@@ -669,27 +710,31 @@ const App = () => {
               </button>
             </div>
           </div>
-          <table className="w-full text-left">
-            <thead><tr className="bg-slate-800/40 text-slate-500 text-[12px] font-black uppercase border-b border-slate-800 tracking-widest"><th className="p-12">Member</th><th className="p-12">Sizing Config</th><th className="p-12 text-center">Add-ons</th><th className="p-12 text-right">Delete</th></tr></thead>
-            <tbody className="divide-y divide-slate-800">
-              {orders.map(o => (
-                <tr key={o.id} className="text-white group hover:bg-slate-800/20 transition-all">
-                  <td className="p-12"><p className="font-black text-3xl italic uppercase tracking-tighter leading-none">{o.playerName}</p><p className="text-sm text-orange-500 font-black mt-3">{o.jerseyName} #{o.number}</p></td>
-                  <td className="p-12"><div className="flex flex-wrap gap-3">
-                    <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">J:{o.customJerseySize || o.jerseySize}</span>
-                    <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">P:{o.customPantSize || o.pantSize}</span>
-                    <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">S:{o.customShortSize || o.shortSize}</span>
-                    <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">Sk:{o.customSkinnySize || o.skinnySize}</span>
-                  </div></td>
-                  <td className="p-12 text-center"><div className="flex flex-col items-center gap-2">
-                    <span className="bg-pink-500/10 text-pink-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Fam: {o.familyKits.length}</span>
-                    <span className="bg-yellow-500/10 text-yellow-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Paid: {o.extraPaidJerseys.length}</span>
-                  </div></td>
-                  <td className="p-12 text-right"><button onClick={() => setOrders(orders.filter(ord => ord.id !== o.id))} className="bg-slate-800 p-5 rounded-[2rem] text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-2xl active:scale-90"><Trash2 size={28}/></button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {orders.length === 0 ? (
+            <div className="p-20 text-center text-slate-500 font-bold">No orders found. Wait for squad members to sign up!</div>
+          ) : (
+            <table className="w-full text-left">
+              <thead><tr className="bg-slate-800/40 text-slate-500 text-[12px] font-black uppercase border-b border-slate-800 tracking-widest"><th className="p-12">Member</th><th className="p-12">Sizing Config</th><th className="p-12 text-center">Add-ons</th><th className="p-12 text-right">Delete</th></tr></thead>
+              <tbody className="divide-y divide-slate-800">
+                {orders.map(o => (
+                  <tr key={o.id} className="text-white group hover:bg-slate-800/20 transition-all">
+                    <td className="p-12"><p className="font-black text-3xl italic uppercase tracking-tighter leading-none">{o.playerName}</p><p className="text-sm text-orange-500 font-black mt-3">{o.jerseyName} #{o.number}</p></td>
+                    <td className="p-12"><div className="flex flex-wrap gap-3">
+                      <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">J:{o.customJerseySize || o.jerseySize}</span>
+                      <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">P:{o.customPantSize || o.pantSize}</span>
+                      <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">S:{o.customShortSize || o.shortSize}</span>
+                      <span className="bg-slate-950 px-4 py-2 rounded-2xl text-xs font-black border border-slate-800">Sk:{o.customSkinnySize || o.skinnySize}</span>
+                    </div></td>
+                    <td className="p-12 text-center"><div className="flex flex-col items-center gap-2">
+                      <span className="bg-pink-500/10 text-pink-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Fam: {o.familyKits.length}</span>
+                      <span className="bg-yellow-500/10 text-yellow-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">Paid: {o.extraPaidJerseys.length}</span>
+                    </div></td>
+                    <td className="p-12 text-right"><button onClick={() => handleDeleteOrder(o.id)} className="bg-slate-800 p-5 rounded-[2rem] text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-2xl active:scale-90"><Trash2 size={28}/></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
