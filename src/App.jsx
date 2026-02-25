@@ -133,7 +133,7 @@ const App = () => {
   const [adminPass, setAdminPass] = useState('');
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [activeChartTab, setActiveChartTab] = useState('adultJersey');
-  const [extraJerseyPrice, setExtraJerseyPrice] = useState(25.00);
+  const [extraJerseyPrice, setExtraJerseyPrice] = useState(25.00); // Admin updated state
   const [searchTerm, setSearchTerm] = useState("");
   const [editingOrder, setEditingOrder] = useState(null);
   
@@ -226,7 +226,7 @@ const App = () => {
   const exportManufacturerReport = async () => {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js');
-    const { jsPDF } = window.jspdf;
+    const { jsPDF } = window.jsPDF;
     const doc = new jsPDF('landscape');
     doc.text("Kurumbas CC - Manufacturer Order Report", 14, 20);
     
@@ -255,19 +255,16 @@ const App = () => {
       const pName = (o.playerName || "").toUpperCase();
       const pPrint = (o.jerseyName || "").toUpperCase();
 
-      // Main Bundle Rows
       rows.push([pName, "Squad Bundle", "Match Polo", pPrint, o.number, o.jerseySize, o.customJerseySize || ""]);
       rows.push([pName, "Squad Bundle", "Training Vest", pPrint, o.number, o.jerseySize, o.customJerseySize || ""]);
       rows.push([pName, "Squad Bundle", "Long Pants", "", "", o.pantSize, o.customPantSize || ""]);
       rows.push([pName, "Squad Bundle", "Training Shorts", "", "", o.shortSize, o.customShortSize || ""]);
       rows.push([pName, "Squad Bundle", "Training Skinny", "", "", o.skinnySize, o.customSkinnySize || ""]);
 
-      // Family Rows
       o.familyKits?.forEach(fk => {
         rows.push([pName, "Family Jersey", "Match Polo", (fk.name || "").toUpperCase(), fk.number || "", fk.size, fk.customSize || ""]);
       });
 
-      // Extra Paid Rows
       o.extraPaidJerseys?.forEach(ek => {
         rows.push([pName, "Extra Gear", "Match Polo", (ek.name || "").toUpperCase(), ek.number || "", ek.size, ek.customSize || ""]);
       });
@@ -373,6 +370,11 @@ const App = () => {
               <div className="flex items-center justify-between border-b border-slate-800 pb-5">
                 <div className="flex items-center gap-4"><div className="bg-yellow-500 p-3 rounded-2xl"><ShoppingBag size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">4. Extra Gear</h3></div>
                 <button type="button" onClick={() => setFormData({...formData, extraPaidJerseys: [...(formData.extraPaidJerseys || []), { id: Date.now(), name: '', number: '', size: 'M', customSize: '' }]})} className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-6 py-3 rounded-2xl text-xs font-black uppercase flex items-center gap-2 hover:bg-yellow-500 hover:text-black shadow-xl transition-all"><PlusCircle size={18}/> Order Extra</button>
+              </div>
+              <div className="bg-yellow-500/5 border border-yellow-500/10 p-6 rounded-3xl flex items-center gap-4">
+                <Banknote size={24} className="text-yellow-500 shrink-0" />
+                {/* Dynamically displaying updated admin price */}
+                <p className="text-xs text-yellow-500/80 font-black uppercase tracking-widest leading-relaxed">Unit Cost: ${extraJerseyPrice} (Sponsorship limit exceeded item)</p>
               </div>
               <div className="space-y-6">
                 {(formData.extraPaidJerseys || []).map(k => (
