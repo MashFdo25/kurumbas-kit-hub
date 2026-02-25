@@ -29,3 +29,5 @@
 
   </div>
 </div>
+// At the very end of your App.jsx file
+export default App;
