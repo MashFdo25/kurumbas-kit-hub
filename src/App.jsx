@@ -22,11 +22,9 @@ const TSHIRT_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.58 PM.png";
 const PANTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.50 PM.png";
 const SHORTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.10.08 PM.png";
 
-// --- ENVIRONMENT ADAPTER ---
 const getEnv = (key) => {
-  try {
-    return import.meta.env[key] || process.env[key] || "";
-  } catch (e) { return ""; }
+  try { return import.meta.env[key] || process.env[key] || ""; } 
+  catch (e) { return ""; }
 };
 
 const apiKey = getEnv('VITE_GEMINI_API_KEY');
@@ -88,8 +86,8 @@ const SizeSelector = ({ label, value, options, onChange, customValue, onCustomCh
 
 const SizeChartModal = ({ activeChartTab, setActiveChartTab, setShowSizeChart }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
-    <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row h-[85vh] lg:h-auto overflow-y-auto shadow-2xl">
-      <div className="flex-1 p-8 md:p-12 space-y-8">
+    <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-[2rem] md:rounded-[3rem] overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-auto overflow-y-auto shadow-2xl">
+      <div className="flex-1 p-6 md:p-12 space-y-8">
         <div className="flex justify-between items-center"><h3 className="text-3xl font-black italic uppercase">Tech Sizing</h3><button onClick={() => setShowSizeChart(false)} className="bg-slate-800 p-3 rounded-full hover:bg-orange-500 transition-all"><X size={20}/></button></div>
         <div className="flex gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
           {Object.keys(SIZE_CHARTS).map(t => (
@@ -115,19 +113,16 @@ const SizeChartModal = ({ activeChartTab, setActiveChartTab, setShowSizeChart })
           </table>
         </div>
       </div>
-      <div className="w-full md:w-80 bg-slate-950/50 p-8 flex flex-col items-center justify-start gap-6 border-t md:border-t-0 md:border-l border-slate-800 overflow-y-auto">
-         <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest w-full text-center mb-2">How to Measure</p>
-         {activeChartTab.includes('Jersey') ? (
-           <div className="space-y-6 w-full">
-             <div className="bg-white p-4 rounded-3xl w-full shadow-lg"><p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Match Polo</p><img src={POLO_MEASURE_IMG} alt="Polo Measurement" className="w-full object-contain" /></div>
-             <div className="bg-white p-4 rounded-3xl w-full shadow-lg"><p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Training T-Shirt</p><img src={TSHIRT_MEASURE_IMG} alt="T-Shirt Measurement" className="w-full object-contain" /></div>
-           </div>
-         ) : (
-           <div className="space-y-6 w-full">
-             <div className="bg-white p-4 rounded-3xl w-full shadow-lg"><p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Long Pants</p><img src={PANTS_MEASURE_IMG} alt="Pants Measurement" className="w-full object-contain" /></div>
-             <div className="bg-white p-4 rounded-3xl w-full shadow-lg"><p className="text-[10px] font-black text-slate-800 uppercase tracking-widest text-center mb-2">Shorts</p><img src={SHORTS_MEASURE_IMG} alt="Shorts Measurement" className="w-full object-contain" /></div>
-           </div>
-         )}
+      <div className="w-full md:w-80 bg-slate-950/50 p-6 md:p-8 flex flex-col items-center gap-6 border-t md:border-t-0 md:border-l border-slate-800">
+         <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest w-full text-center">How to Measure</p>
+         <div className="grid grid-cols-1 gap-4 w-full">
+            <div className="bg-white p-2 rounded-xl shadow-lg">
+              <img src={activeChartTab.includes('Jersey') ? POLO_MEASURE_IMG : PANTS_MEASURE_IMG} className="w-full h-auto object-contain" />
+            </div>
+            <div className="bg-white p-2 rounded-xl shadow-lg">
+              <img src={activeChartTab.includes('Jersey') ? TSHIRT_MEASURE_IMG : SHORTS_MEASURE_IMG} className="w-full h-auto object-contain" />
+            </div>
+         </div>
       </div>
     </div>
   </div>
@@ -160,8 +155,6 @@ const App = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [adminAiBrief, setAdminAiBrief] = useState("");
-  const [isAdminAiLoading, setIsAdminAiLoading] = useState(false);
 
   const loadScript = (src) => {
     return new Promise((resolve) => {
@@ -191,10 +184,8 @@ const App = () => {
 
   useEffect(() => {
     const initAuth = async () => {
-      try { await signInAnonymously(auth); } catch (err) { 
-        setErrorMessage("DB Auth Error. Check Netlify variables.");
-        setDbStatus('error'); 
-      }
+      try { await signInAnonymously(auth); } 
+      catch (err) { setDbStatus('error'); }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); if (u) setDbStatus('connected'); });
@@ -227,7 +218,7 @@ const App = () => {
   const generateAIPersona = async () => {
     if (!formData.playerName) return;
     setIsAiLoading(true);
-    const res = await callGemini(`Nicknames for ${formData.playerName}. Format: NAME1, NAME2, NAME3`, "Sports branding.");
+    const res = await callGemini(`3 nicknames for ${formData.playerName}. Format: N1, N2, N3`, "Sports branding.");
     if (res) setAiSuggestions(res.split(',').map(n => n.trim().toUpperCase()));
     setIsAiLoading(false);
   };
@@ -237,11 +228,34 @@ const App = () => {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js');
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape');
-    doc.text("KCC Manufacturer Report", 14, 20);
-    const tableColumn = ["Player", "Squad Print", "Bundle Sizes", "Family", "Extra Paid"];
-    const tableRows = orders.map(o => [(o.playerName || "").toUpperCase(), (o.jerseyName || "").toUpperCase() + ` #${o.number}`, `J:${o.customJerseySize || o.jerseySize} P:${o.customPantSize || o.pantSize}`, o.familyKits?.length || 0, o.extraPaidJerseys?.length || 0]);
-    doc.autoTable({ head: [tableColumn], body: tableRows, startY: 34 });
-    doc.save("Kurumbas_CC_Report.pdf");
+    doc.text("Kurumbas CC - Manufacturer Order Report", 14, 20);
+    
+    const tableColumn = ["Player Name", "Squad Print (Name & No.)", "Squad Bundle Sizes", "Family Jerseys", "Extra Paid Gear"];
+    const tableRows = orders.map(o => [
+      (o.playerName || "").toUpperCase(),
+      `Name: ${(o.jerseyName || "").toUpperCase()}\nNo: ${o.number}`,
+      `Polo/Vest: ${o.customJerseySize || o.jerseySize}\nPants: ${o.customPantSize || o.pantSize}\nShorts: ${o.customShortSize || o.shortSize}\nSkinny: ${o.customSkinnySize || o.skinnySize}`,
+      o.familyKits?.map(k => `1x ${k.name?.toUpperCase() || ''} #${k.number || ''} | Size: ${k.customSize || k.size}`).join('\n') || "-",
+      o.extraPaidJerseys?.map(k => `1x ${k.name?.toUpperCase() || ''} #${k.number || ''} | Size: ${k.customSize || k.size}`).join('\n') || "-"
+    ]);
+    
+    doc.autoTable({ head: [tableColumn], body: tableRows, startY: 34, theme: 'grid', styles: { fontSize: 8 } });
+    doc.save("Kurumbas_CC_Manufacturer_Report.pdf");
+  };
+
+  const exportToExcel = async () => {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const XLSX = window.XLSX;
+    const rows = [["Player Name", "Squad Print", "Squad Bundle Sizes", "Family Jerseys", "Extra Paid Gear"]];
+    orders.forEach(o => {
+      const bundle = `Polo: ${o.customJerseySize || o.jerseySize}, Pants: ${o.customPantSize || o.pantSize}, Shorts: ${o.customShortSize || o.shortSize}, Skinny: ${o.customSkinnySize || o.skinnySize}`;
+      const format = (list) => list?.map(k => `1x ${k.name?.toUpperCase() || ''} #${k.number || ''} | ${k.customSize || k.size}`).join('; ') || "-";
+      rows.push([(o.playerName || "").toUpperCase(), `${(o.jerseyName || "").toUpperCase()} #${o.number}`, bundle, format(o.familyKits), format(o.extraPaidJerseys)]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    XLSX.writeFile(wb, "Kurumbas_CC_Manufacturer_Report.xlsx");
   };
 
   const handleOrderSubmit = async (e) => {
@@ -300,7 +314,6 @@ const App = () => {
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Squad #</label><input required type="number" placeholder="00" value={formData.number || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-black text-2xl" onChange={e => setFormData({...formData, number: e.target.value})} /></div>
               </div>
             </div>
-            
             <div className="space-y-10">
               <div className="flex items-center gap-4 border-b border-slate-800 pb-5"><div className="bg-orange-500 p-3 rounded-2xl shadow-inner"><Shirt size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">2. Squad Sizing</h3></div>
               <div className="grid md:grid-cols-2 gap-12 pt-4">
@@ -310,7 +323,6 @@ const App = () => {
                 <SizeSelector label="Training Skinny" value={formData.skinnySize} options={['XS','S','M','L','XL','2XL','3XL']} onChange={v => setFormData(prev => ({...prev, skinnySize: v}))} customValue={formData.customSkinnySize} onCustomChange={val => setFormData(prev => ({...prev, customSkinnySize: val}))} />
               </div>
             </div>
-
             <div className="space-y-10">
               <div className="flex items-center justify-between border-b border-slate-800 pb-5">
                 <div className="flex items-center gap-4"><div className="bg-pink-600 p-3 rounded-2xl"><Heart size={24} className="text-white"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic text-pink-500">3. Family Support</h3></div>
@@ -332,7 +344,6 @@ const App = () => {
                 ))}
               </div>
             </div>
-
             <div className="space-y-10">
               <div className="flex items-center justify-between border-b border-slate-800 pb-5">
                 <div className="flex items-center gap-4"><div className="bg-yellow-500 p-3 rounded-2xl"><ShoppingBag size={24} className="text-black"/></div><h3 className="text-3xl font-black uppercase tracking-tighter italic">4. Extra Gear</h3></div>
@@ -351,7 +362,6 @@ const App = () => {
                 ))}
               </div>
             </div>
-
             <button disabled={isSubmitting || !formData.playerName} type="submit" className="w-full bg-white text-black py-8 rounded-[3rem] font-black text-3xl hover:bg-orange-500 transition-all shadow-2xl disabled:opacity-30 uppercase italic flex items-center justify-center gap-4">
               {isSubmitting ? <><Loader2 className="animate-spin" size={32}/> CONFIRMING...</> : (editingOrder ? "UPDATE REGISTRATION" : "REGISTER FOR 2026")}
             </button>
@@ -376,10 +386,13 @@ const App = () => {
       <div className="w-full max-w-xs md:max-w-sm lg:max-w-md mx-auto transform scale-90 md:scale-100">
         <div id="share-card" className="aspect-[9/16] bg-black rounded-[2rem] md:rounded-[4rem] overflow-hidden relative shadow-2xl border border-white/5">
           <div className="absolute inset-0 bg-cover bg-top opacity-80" style={{backgroundImage: `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.9)), url(${PREVIEW_CARD_IMG})`}}></div>
-          <div className="absolute inset-0 p-8 md:p-12 flex flex-col justify-end text-left">
-            <img src={TEAM_LOGO} className="w-16 h-16 md:w-20 md:h-20 mb-6" />
-            <h2 className="text-5xl md:text-7xl font-black italic uppercase leading-none mb-2">{lastOrder?.jerseyName || "JOHN"}</h2>
-            <span className="text-orange-500 font-black text-4xl md:text-6xl italic">#{lastOrder?.number || "00"}</span>
+          <div className="absolute inset-0 p-8 md:p-12 flex flex-col justify-center items-center text-center">
+            <img src={TEAM_LOGO} className="w-16 h-16 md:w-20 md:h-20 mb-12 opacity-90" />
+            <div className="space-y-2">
+              <h2 className="text-5xl md:text-7xl font-black italic uppercase leading-none tracking-tighter">{lastOrder?.jerseyName || "JOHN"}</h2>
+              <span className="text-orange-500 font-black text-7xl md:text-9xl italic leading-none">#{lastOrder?.number || "00"}</span>
+            </div>
+            <div className="absolute bottom-10"><span className="bg-orange-500 text-black px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-full">Official Signing 2026</span></div>
           </div>
         </div>
       </div>
@@ -407,7 +420,7 @@ const App = () => {
           <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-slate-800"><p className="text-[10px] text-slate-500 uppercase font-black mb-4">Prints Req</p><p className="text-6xl font-black italic">{totalPrintsRequired}</p></div>
         </div>
         <div className="bg-slate-900 rounded-[3rem] border border-slate-800 overflow-hidden shadow-2xl">
-          <div className="p-10 border-b border-slate-800 bg-slate-800/20 flex flex-col md:flex-row gap-6 justify-between items-center"><h4 className="text-xl font-black uppercase flex items-center gap-4"><FileText size={24} className="text-orange-500" /> Sponsoring Manifest</h4><div className="flex gap-4"><div className="relative group w-full md:w-64"><Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" /><input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-950 border border-slate-800 pl-10 pr-4 py-2 rounded-xl text-xs outline-none focus:border-orange-500" /></div><button onClick={exportManufacturerReport} className="bg-white text-black px-6 py-2 rounded-xl text-[10px] font-black uppercase">PDF Report</button></div></div>
+          <div className="p-10 border-b border-slate-800 bg-slate-800/20 flex flex-col md:flex-row gap-6 justify-between items-center"><h4 className="text-xl font-black uppercase flex items-center gap-4"><FileText size={24} className="text-orange-500" /> Sponsoring Manifest</h4><div className="flex gap-4"><div className="relative group w-full md:w-64"><Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" /><input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-950 border border-slate-800 pl-10 pr-4 py-2 rounded-xl text-xs outline-none focus:border-orange-500" /></div><button onClick={exportManufacturerReport} className="bg-white text-black px-6 py-2 rounded-xl text-[10px] font-black uppercase">PDF Report</button><button onClick={exportToExcel} className="bg-green-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Excel</button></div></div>
           <table className="w-full text-left">
               <thead><tr className="bg-slate-950/50 text-slate-500 text-[10px] font-black uppercase border-b border-slate-800 tracking-widest"><th className="p-10">Member</th><th className="p-10">Sizing Config</th><th className="p-10">Add-Ons</th><th className="p-10 text-right">Actions</th></tr></thead>
               <tbody className="divide-y divide-slate-800/50">
@@ -421,10 +434,7 @@ const App = () => {
                             </span>
                         ))}
                     </div></td>
-                    <td className="p-10"><div className="flex gap-2">
-                        {o.familyKits?.length > 0 && <span className="bg-pink-500/10 text-pink-500 px-3 py-1.5 rounded-lg text-[9px] font-black border border-pink-500/20">FAM: {o.familyKits.length}</span>}
-                        {o.extraPaidJerseys?.length > 0 && <span className="bg-yellow-500/10 text-yellow-500 px-3 py-1.5 rounded-lg text-[9px] font-black border border-yellow-500/20">PAID: {o.extraPaidJerseys.length}</span>}
-                    </div></td>
+                    <td className="p-10 text-center">Fam: {o.familyKits?.length || 0}</td>
                     <td className="p-10 text-right space-x-2"><button onClick={() => handleEditOrder(o)} className="bg-slate-800 p-4 rounded-xl text-slate-500 hover:text-orange-500"><Edit3 size={20}/></button><button onClick={() => handleDeleteOrder(o.id)} className="bg-slate-800 p-4 rounded-xl text-slate-500 hover:text-red-500"><Trash2 size={20}/></button></td>
                   </tr>
                 ))}
