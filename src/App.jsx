@@ -13,10 +13,10 @@ import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query } f
 
 // --- ASSETS & CONFIG ---
 const TEAM_LOGO = "Kurumba Logo.jpg";
-const FRONT_VIEW_IMG = "Front.jpg";  // Used for Gear References
+const FRONT_VIEW_IMG = "Front.jpg";  // Used for Gear References (Match Polo / Vest)
 const BACK_VIEW_IMG = "Back.jpg";    // Used for Name/Number previews
 
-// Logic mapping
+// Logic mapping based on your request
 const MATCH_KIT_IMG = FRONT_VIEW_IMG;
 const TRAINING_KIT_IMG = FRONT_VIEW_IMG;
 const PREVIEW_CARD_IMG = BACK_VIEW_IMG;
@@ -26,25 +26,25 @@ const TSHIRT_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.58 PM.png";
 const PANTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.09.50 PM.png";
 const SHORTS_MEASURE_IMG = "Screenshot 2026-02-24 at 12.10.08 PM.png";
 
-// Hardcoded for preview compatibility. For Netlify deployment, use import.meta.env
+// Hardcoded for compatibility with the preview environment and to avoid import.meta errors
 const apiKey = "gen-lang-client-0867680743"; 
 const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
 
 // --- DATABASE CONFIGURATION ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "AIzaSyCxUk4hWuP0xCPyYupkjK28e419fgfUb1w",
-      authDomain: "kurumbaskithub.firebaseapp.com",
-      projectId: "kurumbaskithub",
-      storageBucket: "kurumbaskithub.firebasestorage.app",
-      messagingSenderId: "1075784604577",
-      appId: "1:1075784604577:web:152e6b5863011a214509e0"
-    };
+// Hardcoded values to ensure the "Preview" and "Register" logic work immediately without compilation errors
+const firebaseConfig = {
+  apiKey: "AIzaSyCxUk4hWuP0xCPyYupkjK28e419fgfUb1w",
+  authDomain: "kurumbaskithub.firebaseapp.com",
+  projectId: "kurumbaskithub",
+  storageBucket: "kurumbaskithub.firebasestorage.app",
+  messagingSenderId: "1075784604577",
+  appId: "1:1075784604577:web:152e6b5863011a214509e0"
+};
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase services outside the component
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 const projectAppId = typeof __app_id !== 'undefined' ? __app_id : 'kurumbas-kit-hub';
 
 // --- EXACT MANUFACTURER DATA ---
@@ -79,7 +79,7 @@ const SIZE_CHARTS = {
   ]
 };
 
-// --- SUB-COMPONENTS (Defined outside App to prevent focus loss while typing) ---
+// --- STABLE SUB-COMPONENTS (Defined outside App to prevent focus loss) ---
 
 const SizeSelector = ({ label, value, options, onChange, customValue, onCustomChange }) => (
   <div className="space-y-3">
@@ -232,8 +232,8 @@ const App = () => {
   // --- DERIVED METRICS ---
   const totalPrintsRequired = useMemo(() => {
     return orders.reduce((sum, o) => {
-      const familyPrints = o.familyKits.filter(k => k.name || k.number).length;
-      const extraPrints = o.extraPaidJerseys.filter(k => k.name || k.number).length;
+      const familyPrints = o.familyKits?.filter(k => k.name || k.number).length || 0;
+      const extraPrints = o.extraPaidJerseys?.filter(k => k.name || k.number).length || 0;
       return sum + familyPrints + extraPrints;
     }, 0);
   }, [orders]);
@@ -242,6 +242,7 @@ const App = () => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // Handle environment priority
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
@@ -249,7 +250,7 @@ const App = () => {
         }
       } catch (err) { 
         console.error("Firebase Auth Error:", err); 
-        setErrorMessage("Database Authentication Failed. Please check console.");
+        setErrorMessage("Database Authentication Failed. Please check if Anonymous sign-in is enabled in Firebase.");
         setDbStatus('error'); 
       }
     };
@@ -278,7 +279,7 @@ const App = () => {
       (error) => {
         console.error("Firestore Listen Error:", error);
         setDbStatus('error');
-        setErrorMessage("Live Sync Failed: " + error.message);
+        setErrorMessage("Live Sync Error: " + error.message);
       }
     );
     return () => unsubscribe();
@@ -308,7 +309,7 @@ const App = () => {
   const generateAIPersona = async () => {
     if (!formData.playerName) return;
     setIsAiLoading(true);
-    const prompt = `Suggest 3 high-energy jersey nicknames for a Sri Lankan player named "${formData.playerName}". Return format: NAME1, NAME2, NAME3`;
+    const prompt = `Suggest 3 high-energy jersey nicknames for a player named "${formData.playerName}". Return format: NAME1, NAME2, NAME3`;
     const res = await callGemini(prompt, "Creative sports branding assistant.");
     if (res) setAiSuggestions(res.split(',').map(n => n.trim().toUpperCase()));
     setIsAiLoading(false);
@@ -333,7 +334,7 @@ const App = () => {
     doc.text("Kurumbas CC - Manufacturer Order Report", 14, 20);
     
     doc.setFontSize(10);
-    doc.text(`Total Squad Bundles: ${orders.length}  |  Family Jerseys: ${orders.reduce((s,o)=>s+o.familyKits.length,0)}  |  Extra Paid Gear: ${orders.reduce((s,o)=>s+o.extraPaidJerseys.length,0)}  |  Extra/Family Prints Req: ${totalPrintsRequired}`, 14, 28);
+    doc.text(`Total Squad Bundles: ${orders.length}  |  Family Jerseys: ${orders.reduce((s,o)=>s+(o.familyKits?.length || 0),0)}  |  Extra Paid Gear: ${orders.reduce((s,o)=>s+(o.extraPaidJerseys?.length || 0),0)}  |  Extra/Family Prints Req: ${totalPrintsRequired}`, 14, 28);
 
     const tableColumn = [
       "Player Name", 
@@ -355,8 +356,8 @@ const App = () => {
         return `1x ${details.join(' | ')}`;
       };
 
-      const family = o.familyKits.length > 0 ? o.familyKits.map(formatKitItem).join('\n\n') : "-";
-      const extra = o.extraPaidJerseys.length > 0 ? o.extraPaidJerseys.map(formatKitItem).join('\n\n') : "-";
+      const family = o.familyKits?.length > 0 ? o.familyKits.map(formatKitItem).join('\n\n') : "-";
+      const extra = o.extraPaidJerseys?.length > 0 ? o.extraPaidJerseys.map(formatKitItem).join('\n\n') : "-";
 
       return [o.playerName, printDetails, squadSizes, family, extra];
     });
@@ -388,11 +389,11 @@ const App = () => {
       rows.push(["Squad Bundle", o.playerName, "Training Shorts", "", "", o.shortSize, o.customShortSize || ""]);
       rows.push(["Squad Bundle", o.playerName, "Training Skinny", "", "", o.skinnySize, o.customSkinnySize || ""]);
 
-      o.familyKits.forEach(fk => {
+      o.familyKits?.forEach(fk => {
         rows.push(["Family Support", o.playerName, "Match Polo", fk.name || "", fk.number || "", fk.size, fk.customSize || ""]);
       });
 
-      o.extraPaidJerseys.forEach(ek => {
+      o.extraPaidJerseys?.forEach(ek => {
         rows.push(["Extra Paid Gear", o.playerName, "Match Polo", ek.name || "", ek.number || "", ek.size, ek.customSize || ""]);
       });
     });
@@ -413,7 +414,6 @@ const App = () => {
     try {
       const orderId = Date.now().toString();
       
-      // Clean data to ensure no 'undefined' values (which Firestore rejects)
       const finalOrder = { 
         playerName: formData.playerName || "",
         jerseyName: formData.jerseyName || "",
@@ -426,14 +426,14 @@ const App = () => {
         customShortSize: formData.customShortSize || "",
         skinnySize: formData.skinnySize || "",
         customSkinnySize: formData.customSkinnySize || "",
-        familyKits: formData.familyKits.map(k => ({
+        familyKits: (formData.familyKits || []).map(k => ({
           id: k.id,
           name: k.name || "",
           number: k.number || "",
           size: k.size || "",
           customSize: k.customSize || ""
         })),
-        extraPaidJerseys: formData.extraPaidJerseys.map(k => ({
+        extraPaidJerseys: (formData.extraPaidJerseys || []).map(k => ({
           id: k.id,
           name: k.name || "",
           number: k.number || "",
@@ -445,15 +445,11 @@ const App = () => {
       };
       
       if (db && user) {
-        // Use a timeout race to prevent hanging indefinitely
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Database timeout. Check your connection.")), 10000)
-        );
-        
-        await Promise.race([
-          setDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId), finalOrder),
-          timeoutPromise
-        ]);
+        // Defensive race against timeout to prevent UI hang
+        const writePromise = setDoc(doc(db, 'artifacts', projectAppId, 'public', 'data', 'orders', orderId), finalOrder);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database write timed out.")), 10000));
+
+        await Promise.race([writePromise, timeoutPromise]);
         
         setLastOrder(finalOrder);
         setView('success');
@@ -463,7 +459,7 @@ const App = () => {
         document.head.appendChild(script);
         script.onload = () => { if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); };
       } else {
-        throw new Error("Database not ready. Please try again in a moment.");
+        throw new Error("No Active Database Connection.");
       }
     } catch (err) {
       console.error("Submission failed:", err);
@@ -509,7 +505,7 @@ const App = () => {
       <div className="absolute inset-0 opacity-5 bg-center bg-cover scale-110" style={{backgroundImage: `url(${MATCH_KIT_IMG})`}}></div>
       
       {dbStatus === 'error' && (
-        <div className="absolute top-4 left-4 bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-full text-[10px] font-black uppercase flex flex-col items-start gap-1">
+        <div className="absolute top-4 left-4 bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-full text-[10px] font-black uppercase flex flex-col items-start gap-1 z-50">
           <div className="flex items-center gap-2"><AlertTriangle size={12}/> Connection Error</div>
           {errorMessage && <div className="text-[8px] opacity-60 normal-case">{errorMessage}</div>}
         </div>
@@ -563,7 +559,7 @@ const App = () => {
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Legal Name</label><input required placeholder="Your Full Name" value={formData.playerName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-bold transition-all" onChange={e => setFormData({...formData, playerName: e.target.value})} /></div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Jersey Print</label><button type="button" onClick={generateAIPersona} className="text-orange-500 text-[10px] font-black uppercase flex items-center gap-1 hover:text-white transition-all"><Sparkles size={12}/> AI</button></div>
-                  <input required maxLength={12} placeholder="THAAL" value={formData.jerseyName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none uppercase font-black focus:border-orange-500 transition-all" onChange={e => setFormData({...formData, jerseyName: e.target.value})} />
+                  <input required maxLength={12} placeholder="JOHN" value={formData.jerseyName || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none uppercase font-black focus:border-orange-500 transition-all" onChange={e => setFormData({...formData, jerseyName: e.target.value})} />
                 </div>
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Squad #</label><input required type="number" placeholder="00" value={formData.number || ""} className="w-full bg-slate-950 border border-slate-800 p-5 rounded-2xl outline-none focus:border-orange-500 font-black text-2xl transition-all" onChange={e => setFormData({...formData, number: e.target.value})} /></div>
               </div>
@@ -587,7 +583,7 @@ const App = () => {
                 </div>
                 <button 
                   type="button" 
-                  onClick={() => setFormData({...formData, familyKits: [...formData.familyKits, { id: Date.now(), name: '', number: '', size: 'W-M', customSize: '' }]})} 
+                  onClick={() => setFormData({...formData, familyKits: [...(formData.familyKits || []), { id: Date.now(), name: '', number: '', size: 'W-M', customSize: '' }]})} 
                   className="bg-pink-600/10 border border-pink-600/20 text-pink-500 px-6 py-3 rounded-2xl text-xs font-black uppercase flex items-center gap-2 hover:bg-pink-600 hover:text-white transition-all shadow-xl"
                 >
                   <PlusCircle size={18}/> Add Member
@@ -595,7 +591,7 @@ const App = () => {
               </div>
               
               <div className="space-y-6">
-                {formData.familyKits.map(k => (
+                {(formData.familyKits || []).map(k => (
                   <div key={k.id} className="bg-slate-950 p-8 rounded-[2.5rem] border border-slate-800 flex flex-col gap-6 relative animate-in slide-in-from-right">
                     <button type="button" onClick={() => setFormData({...formData, familyKits: formData.familyKits.filter(x => x.id !== k.id)})} className="absolute -top-3 -right-3 bg-slate-800 p-2.5 rounded-full text-slate-600 hover:text-red-500 transition-colors shadow-2xl border border-slate-700"><Trash2 size={18}/></button>
                     <div className="grid grid-cols-3 gap-6">
@@ -632,7 +628,7 @@ const App = () => {
                 </div>
                 <button 
                   type="button" 
-                  onClick={() => setFormData({...formData, extraPaidJerseys: [...formData.extraPaidJerseys, { id: Date.now(), name: '', number: '', size: 'M', customSize: '' }]})} 
+                  onClick={() => setFormData({...formData, extraPaidJerseys: [...(formData.extraPaidJerseys || []), { id: Date.now(), name: '', number: '', size: 'M', customSize: '' }]})} 
                   className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-6 py-3 rounded-2xl text-xs font-black uppercase flex items-center gap-2 hover:bg-yellow-500 hover:text-black transition-all shadow-xl"
                 >
                   <PlusCircle size={18}/> Order Extra
@@ -645,7 +641,7 @@ const App = () => {
               </div>
 
               <div className="space-y-6">
-                {formData.extraPaidJerseys.map(k => (
+                {(formData.extraPaidJerseys || []).map(k => (
                   <div key={k.id} className="bg-slate-950 p-8 rounded-[2.5rem] border border-slate-800 flex flex-col gap-6 relative animate-in slide-in-from-right">
                     <button type="button" onClick={() => setFormData({...formData, extraPaidJerseys: formData.extraPaidJerseys.filter(x => x.id !== k.id)})} className="absolute -top-3 -right-3 bg-slate-800 p-2.5 rounded-full text-slate-600 hover:text-red-500 transition-colors shadow-2xl border border-slate-700"><Trash2 size={18}/></button>
                     <div className="grid grid-cols-3 gap-6">
@@ -687,7 +683,7 @@ const App = () => {
              <div className="relative w-[380px] h-[520px] md:w-[440px] md:h-[600px] bg-slate-900 rounded-t-[100px] shadow-[0_80px_160px_rgba(0,0,0,0.9)] overflow-hidden border-b-[60px] border-black transition-all duration-700 hover:rotate-y-6">
                 <div className="absolute inset-0 bg-cover bg-top" style={{backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${PREVIEW_CARD_IMG})`}}></div>
                 <div className="absolute top-[28%] w-full flex flex-col items-center px-12 text-center">
-                   <h2 className="text-white font-black text-4xl md:text-5xl tracking-tighter uppercase drop-shadow-[0_5px_15px_rgba(0,0,0,1)] break-all leading-tight mb-4">{formData.jerseyName || "PLAYER"}</h2>
+                   <h2 className="text-white font-black text-4xl md:text-5xl tracking-tighter uppercase drop-shadow-[0_5px_15px_rgba(0,0,0,1)] break-all leading-tight mb-4">{formData.jerseyName || "JOHN"}</h2>
                    <span className="text-[#D4AF37] font-black text-[180px] md:text-[240px] leading-[0.7] drop-shadow-[0_10px_60px_rgba(0,0,0,1)] italic">{formData.number || "00"}</span>
                 </div>
                 <div className="absolute bottom-12 left-12 flex items-center gap-4"><img src={TEAM_LOGO} className="w-16 h-16 opacity-90" /><div className="h-12 w-px bg-white/20"></div><div><p className="text-white text-xs font-black uppercase tracking-widest">KCC Squad</p><p className="text-white/40 text-[9px] font-bold uppercase tracking-widest">Official Gear</p></div></div>
@@ -743,7 +739,7 @@ const App = () => {
             <AlertTriangle size={24} /> 
             <div>
               <p>Warning: Database Sync Error</p>
-              <p className="text-xs font-normal opacity-80 mt-1">Check your Firebase console. (Error: {errorMessage})</p>
+              <p className="text-xs font-normal opacity-80 mt-1">Check your Firebase console settings. (Error: {errorMessage})</p>
             </div>
           </div>
         )}
