@@ -8,7 +8,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 // --- ASSETS & CONFIG ---
@@ -27,22 +27,24 @@ const getEnv = (key) => {
   catch (e) { return ""; }
 };
 
-const apiKey = getEnv('VITE_GEMINI_API_KEY');
+const apiKey = ""; // Set by environment
 const GEMINI_MODEL = "gemini-2.0-flash";
 
-const firebaseConfig = {
-  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
-  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
-  projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
-  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
-  appId: getEnv('VITE_FIREBASE_APP_ID')
-};
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+    apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+    authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+    projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
+    storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+    appId: getEnv('VITE_FIREBASE_APP_ID')
+  };
 
 const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const projectAppId = "kurumbas-kit-hub";
+const projectAppId = typeof __app_id !== 'undefined' ? __app_id : 'kurumbas-kit-hub';
 
 const SIZE_CHARTS = {
   adultJersey: [
@@ -88,45 +90,67 @@ const SizeSelector = ({ label, value, options, onChange, customValue, onCustomCh
   </div>
 );
 
+// --- MODIFIED SIZE CHART MODAL ---
 const SizeChartModal = ({ activeChartTab, setActiveChartTab, setShowSizeChart }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
-    <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-[2rem] md:rounded-[3rem] overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-auto overflow-y-auto shadow-2xl">
-      <div className="flex-1 p-6 md:p-12 space-y-8">
-        <div className="flex justify-between items-center"><h3 className="text-3xl font-black italic uppercase">Tech Sizing</h3><button onClick={() => setShowSizeChart(false)} className="bg-slate-800 p-3 rounded-full hover:bg-orange-500 transition-all"><X size={20}/></button></div>
-        <div className="flex gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
-          {Object.keys(SIZE_CHARTS).map(t => (
-            <button key={t} onClick={() => setActiveChartTab(t)} className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase transition-all ${activeChartTab === t ? 'bg-orange-500 text-black shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-white'}`}>{t.replace(/([A-Z])/g, ' $1')}</button>
-          ))}
+  <div 
+    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in cursor-pointer"
+    onClick={() => setShowSizeChart(false)}
+  >
+    <div 
+      className="bg-slate-900 border border-slate-800 w-full max-w-6xl rounded-[2.5rem] overflow-hidden flex flex-col md:flex-row max-h-[90vh] shadow-2xl cursor-default"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Sticky Header */}
+        <div className="p-6 md:p-8 bg-slate-900 border-b border-slate-800 flex justify-between items-center z-10">
+          <h3 className="text-3xl font-black italic uppercase">Tech Sizing</h3>
+          <button 
+            onClick={() => setShowSizeChart(false)} 
+            className="bg-slate-800 p-3 rounded-full hover:bg-orange-500 hover:text-black transition-all"
+          >
+            <X size={24}/>
+          </button>
         </div>
-        <div className="bg-slate-950 rounded-[2rem] overflow-hidden border border-slate-800 shadow-2xl">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-800/40 text-slate-500 uppercase font-black tracking-widest border-b border-slate-800 text-[10px]">
-                <th className="p-6">Size</th>
-                {activeChartTab.includes('Jersey') ? (<><th className="p-6">Width (In)</th><th className="p-6">Height (In)</th></>) : (<><th className="p-6">Waist</th><th className="p-6">Pants Len</th><th className="p-6">Shorts Len</th></>)}
-              </tr>
-            </thead>
-            <tbody>
-              {SIZE_CHARTS[activeChartTab].map((r, i) => (
-                <tr key={i} className="border-b border-slate-800/30 hover:bg-white/5 transition-colors text-sm font-bold">
-                  <td className="p-6 font-black text-orange-500 italic">{r.size}</td>
-                  {activeChartTab.includes('Jersey') ? (<><td className="p-6">{r.width}</td><td className="p-6">{r.height}</td></>) : (<><td className="p-6">{r.waist}</td><td className="p-6">{r.length}</td><td className="p-6">{r.short}</td></>)}
+
+        {/* Scrollable Body */}
+        <div className="p-6 md:p-12 overflow-y-auto space-y-8 flex-1">
+          <div className="flex gap-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+            {Object.keys(SIZE_CHARTS).map(t => (
+              <button key={t} onClick={() => setActiveChartTab(t)} className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase transition-all ${activeChartTab === t ? 'bg-orange-500 text-black shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-white'}`}>{t.replace(/([A-Z])/g, ' $1')}</button>
+            ))}
+          </div>
+          <div className="bg-slate-950 rounded-[2rem] overflow-hidden border border-slate-800 shadow-2xl">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-800/40 text-slate-500 uppercase font-black tracking-widest border-b border-slate-800 text-[10px]">
+                  <th className="p-6">Size</th>
+                  {activeChartTab.includes('Jersey') ? (<><th className="p-6">Width (In)</th><th className="p-6">Height (In)</th></>) : (<><th className="p-6">Waist</th><th className="p-6">Pants Len</th><th className="p-6">Shorts Len</th></>)}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {SIZE_CHARTS[activeChartTab].map((r, i) => (
+                  <tr key={i} className="border-b border-slate-800/30 hover:bg-white/5 transition-colors text-sm font-bold">
+                    <td className="p-6 font-black text-orange-500 italic">{r.size}</td>
+                    {activeChartTab.includes('Jersey') ? (<><td className="p-6">{r.width}</td><td className="p-6">{r.height}</td></>) : (<><td className="p-6">{r.waist}</td><td className="p-6">{r.length}</td><td className="p-6">{r.short}</td></>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div className="w-full md:w-80 bg-slate-950/50 p-6 md:p-8 flex flex-col items-center gap-6 border-t md:border-t-0 md:border-l border-slate-800">
-         <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest w-full text-center">How to Measure</p>
-         <div className="grid grid-cols-1 gap-4 w-full">
+
+      {/* Measurement Guide Sidebar */}
+      <div className="w-full md:w-80 bg-slate-950/50 p-6 md:p-8 flex flex-col items-center gap-6 border-t md:border-t-0 md:border-l border-slate-800 overflow-y-auto max-h-[40vh] md:max-h-none">
+          <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest w-full text-center">How to Measure</p>
+          <div className="grid grid-cols-1 gap-4 w-full">
             <div className="bg-white p-2 rounded-xl shadow-lg">
-              <img src={activeChartTab.includes('Jersey') ? POLO_MEASURE_IMG : PANTS_MEASURE_IMG} className="w-full h-auto object-contain" />
+              <img src={activeChartTab.includes('Jersey') ? POLO_MEASURE_IMG : PANTS_MEASURE_IMG} className="w-full h-auto object-contain" alt="Measurement 1" />
             </div>
             <div className="bg-white p-2 rounded-xl shadow-lg">
-              <img src={activeChartTab.includes('Jersey') ? TSHIRT_MEASURE_IMG : SHORTS_MEASURE_IMG} className="w-full h-auto object-contain" />
+              <img src={activeChartTab.includes('Jersey') ? TSHIRT_MEASURE_IMG : SHORTS_MEASURE_IMG} className="w-full h-auto object-contain" alt="Measurement 2" />
             </div>
-         </div>
+          </div>
       </div>
     </div>
   </div>
@@ -181,14 +205,20 @@ const App = () => {
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => 
-      o.playerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.jerseyName.toLowerCase().includes(searchTerm.toLowerCase())
+      o.playerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.jerseyName?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [orders, searchTerm]);
 
   useEffect(() => {
     const initAuth = async () => {
-      try { await signInAnonymously(auth); } catch (err) { setDbStatus('error'); }
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) { setDbStatus('error'); }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); if (u) setDbStatus('connected'); });
