@@ -347,7 +347,7 @@ const App = () => {
                       <input placeholder="NO" type="number" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-xs font-black outline-none focus:border-pink-600" value={k.number} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, number: e.target.value} : x)})} />
                       <select className="w-full bg-slate-900 border border-pink-500/20 p-4 rounded-xl text-xs font-black outline-none" value={k.size} onChange={e => setFormData({...formData, familyKits: formData.familyKits.map(x => x.id === k.id ? {...x, size: e.target.value} : x)})}>
                         <optgroup label="Adults">{['W-XS','W-S','W-M','W-L'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
-                        <optgroup label="Kids">{['9XS','8XS','7XS','6XS','5XS','4XS','3XS','2X'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
+                        <optgroup label="Kids">{['9XS','8XS','7XS','6XS','5XS','4XS','3XS','2X','XS','S','M','L','XL','2XL','3XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}</optgroup>
                       </select>
                     </div>
                   </div>
