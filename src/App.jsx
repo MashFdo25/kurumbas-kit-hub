@@ -56,6 +56,10 @@ const SIZE_CHARTS = {
     { size: '7XS', width: '11"', height: '15.5"' }, { size: '6XS', width: '12.5"', height: '17.5"' },
     { size: '5XS', width: '13.5"', height: '19"' }, { size: '4XS', width: '14.5"', height: '20.5"' },
     { size: '3XS', width: '15"', height: '22"' }, { size: '2X', width: '15.5"', height: '23.5"' },
+    { size: 'XS', width: '16.5"', height: '24.5"' }, { size: 'S', width: '17.5"', height: '25.5"' },
+    { size: 'M', width: '18.5"', height: '26.5"' }, { size: 'L', width: '20"', height: '28.5"' },
+    { size: 'XL', width: '21"', height: '29.5"' }, { size: '2XL', width: '22.5"', height: '30.5"' },
+    { size: '3XL', width: '26"', height: '32"' },
   ],
   bottoms: [
     { size: 'XS', waist: '26/28', length: '39.5"', short: '18"' }, { size: 'S', waist: '26/28', length: '39.5"', short: '18"' },
